@@ -2,7 +2,7 @@
 
 ## Project Overview
 
-SvelteKit + Tauri アプリケーション（現在はWebアプリとして動作、Tauri統合は未実装）
+SvelteKit + Tauri デスクトップアプリケーション（Tauri統合済み）
 
 ## Development Commands
 
@@ -20,6 +20,12 @@ yarn check
 
 # プレビュー
 yarn preview
+
+# Tauri デスクトップアプリ開発
+yarn tauri:dev
+
+# Tauri デスクトップアプリビルド
+yarn tauri:build
 ```
 
 ## Code Quality Requirements
@@ -33,6 +39,7 @@ yarn preview
 ## Tech Stack
 
 - SvelteKit (v2.22.0) + Svelte 5.0
+- Tauri v2
 - TypeScript (strict mode)
 - Tailwind CSS v4
 - Vite
@@ -54,5 +61,5 @@ yarn preview
 
 ## Notes
 
-- Tauri CLIはインストール済みだが、まだ初期化されていない
-- 将来的に `yarn tauri init` でデスクトップアプリ化可能
+- Tauri統合済み、デスクトップアプリとして動作可能
+- WebアプリとしてもTauriアプリとしても動作可能
