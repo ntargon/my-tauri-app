@@ -35,6 +35,7 @@ yarn tauri:build
 1. `yarn format` - コードフォーマット
 2. `yarn lint` - リント・型チェック
 3. `yarn build` - ビルド確認
+4. 必要に応じてPlaywrightツールでブラウザ動作確認を実行
 
 ## Tech Stack
 
@@ -42,8 +43,10 @@ yarn tauri:build
 - Tauri v2
 - TypeScript (strict mode)
 - Tailwind CSS v4
+- shadcn-svelte (UI コンポーネントライブラリ)
 - Vite
 - ESLint + Prettier
+- Playwright (ブラウザテスト)
 
 ## Code Style
 
@@ -59,7 +62,21 @@ yarn tauri:build
 - `src/app.css` - グローバルスタイル（Tailwind）
 - `static/` - 静的ファイル
 
+## UI Components (shadcn-svelte)
+
+```bash
+# 新しいコンポーネント追加
+npx shadcn-svelte@latest add [component-name]
+
+# 例: Buttonコンポーネント追加済み
+npx shadcn-svelte@latest add button
+```
+
+設定ファイル: `components.json`
+コンポーネント配置: `src/lib/components/ui/`
+
 ## Notes
 
 - Tauri統合済み、デスクトップアプリとして動作可能
 - WebアプリとしてもTauriアプリとしても動作可能
+- shadcn-svelte導入済み、UIコンポーネントライブラリが利用可能
