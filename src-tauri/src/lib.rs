@@ -6,6 +6,9 @@ pub fn run() {
   tauri::Builder::default()
     .plugin(tauri_plugin_store::Builder::default().build())
     .setup(|app| {
+      // TCP機能用にAppHandleを初期化
+      tcp::init_app_handle(app.handle().clone());
+      
       if cfg!(debug_assertions) {
         app.handle().plugin(
           tauri_plugin_log::Builder::default()

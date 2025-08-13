@@ -9,6 +9,7 @@ use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
 use chrono::{Local, Utc};
 use uuid::Uuid;
+use tauri::{AppHandle, Emitter};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TcpMessage {
@@ -71,6 +72,12 @@ pub struct TcpReceiveResult {
     pub success: bool,
     pub messages: Vec<TcpReceivedMessage>,
     pub error: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TcpMessageReceivedEvent {
+    pub connection_id: String,
+    pub message: TcpReceivedMessage,
 }
 
 #[derive(Debug)]
@@ -161,6 +168,14 @@ static CONNECTIONS: std::sync::OnceLock<Arc<Mutex<HashMap<String, ConnectionData
 // 旧サーバー機能のためのグローバル状態（後方互換性）
 static RECEIVED_MESSAGES: std::sync::OnceLock<Arc<Mutex<Vec<TcpReceivedMessage>>>> = std::sync::OnceLock::new();
 static SERVER_HANDLE: std::sync::OnceLock<Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>> = std::sync::OnceLock::new();
+
+// アプリハンドルを保存するためのグローバル状態
+static APP_HANDLE: std::sync::OnceLock<AppHandle> = std::sync::OnceLock::new();
+
+/// AppHandleを初期化する関数
+pub fn init_app_handle(app_handle: AppHandle) {
+    APP_HANDLE.set(app_handle).ok();
+}
 
 #[tauri::command]
 pub async fn start_tcp_server(config: TcpServerConfig) -> Result<String, TcpError> {
@@ -281,7 +296,9 @@ async fn handle_tcp_client(
 
 // 新しい接続管理機能
 #[tauri::command]
-pub async fn connect_tcp(request: TcpConnectionRequest) -> Result<TcpConnectionResult, TcpError> {
+pub async fn connect_tcp(app_handle: AppHandle, request: TcpConnectionRequest) -> Result<TcpConnectionResult, TcpError> {
+    // AppHandleを保存
+    APP_HANDLE.set(app_handle).ok();
     let address = format!("{}:{}", request.host, request.port);
     
     // アドレスの妥当性をチェック
@@ -470,7 +487,20 @@ async fn handle_connection_receiver(
                     };
                     
                     let mut messages_guard = messages.lock().await;
-                    messages_guard.push(received_msg);
+                    messages_guard.push(received_msg.clone());
+                    drop(messages_guard); // Release the lock early
+                    
+                    // イベントを発行してフロントエンドに通知
+                    if let Some(app_handle) = APP_HANDLE.get() {
+                        let event = TcpMessageReceivedEvent {
+                            connection_id: connection_id.clone(),
+                            message: received_msg,
+                        };
+                        
+                        if let Err(e) = app_handle.emit("tcp_message_received", &event) {
+                            log::error!("Failed to emit tcp_message_received event: {}", e);
+                        }
+                    }
                     
                     log::info!("Received message on connection {}: {}", connection_id, message);
                 }

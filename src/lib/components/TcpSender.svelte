@@ -1,11 +1,11 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
-	import { Slider } from '$lib/components/ui/slider/index.js';
+
 	import { TcpClient } from '$lib/tcp-client.js';
 	import type { TcpReceivedMessage, TcpConnection } from '$lib/types/tcp.js';
 	import { onMount, onDestroy } from 'svelte';
-	import { listen } from '@tauri-apps/api/event';
+	import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 	import { fontSize, loadSettings } from '$lib/stores/settings.js';
 	import { SettingsWindow } from '$lib/settings-window.js';
 
@@ -26,7 +26,7 @@
 
 	// 受信機能の状態
 	let receivedMessages: TcpReceivedMessage[] = $state([]);
-	let messagePollingInterval: number | null = null;
+	let messageEventUnlisten: UnlistenFn | null = null;
 
 	// 送信履歴の状態
 	interface SentMessage {
@@ -90,7 +90,7 @@
 				connection = response.connection;
 				isConnected = true;
 				connectionResult = `接続確立: ${response.connection.host}:${response.connection.port}`;
-				startMessagePolling();
+				setupMessageEventListener();
 			} else {
 				connectionError = response.error || '接続に失敗しました';
 			}
@@ -105,7 +105,7 @@
 		if (!isConnected || !connection) return;
 
 		try {
-			stopMessagePolling();
+			stopMessageEventListener();
 			const response = await TcpClient.disconnect(connection.id);
 
 			if (response.success) {
@@ -195,37 +195,37 @@
 		}
 	}
 
-	// メッセージポーリング開始
-	function startMessagePolling() {
-		if (messagePollingInterval || !connection) return;
+	// イベントリスナー設定
+	async function setupMessageEventListener() {
+		if (!connection) return;
 
-		messagePollingInterval = setInterval(async () => {
-			if (!connection || !isConnected) {
-				stopMessagePolling();
-				return;
+		try {
+			// 既存のメッセージを取得
+			const response = await TcpClient.getReceivedMessagesFromConnection(connection.id);
+			if (response.success) {
+				receivedMessages = response.messages;
 			}
 
-			try {
-				const response = await TcpClient.getReceivedMessagesFromConnection(connection.id);
-				if (response.success) {
-					const oldLength = receivedMessages.length;
-					receivedMessages = response.messages;
-					// 新しいメッセージが追加された場合のみスクロール
-					if (response.messages.length > oldLength) {
-						scrollToBottom();
-					}
+			// イベントリスナーを設定
+			messageEventUnlisten = await listen('tcp_message_received', (event) => {
+				const payload = event.payload as { connection_id: string; message: TcpReceivedMessage };
+
+				// 現在の接続からのメッセージかチェック
+				if (connection && payload.connection_id === connection.id) {
+					receivedMessages = [...receivedMessages, payload.message];
+					scrollToBottom();
 				}
-			} catch (e) {
-				console.error('メッセージ取得エラー:', e);
-			}
-		}, 1000); // 1秒ごとにポーリング
+			});
+		} catch (error) {
+			console.error('イベントリスナー設定エラー:', error);
+		}
 	}
 
-	// メッセージポーリング停止
-	function stopMessagePolling() {
-		if (messagePollingInterval) {
-			clearInterval(messagePollingInterval);
-			messagePollingInterval = null;
+	// イベントリスナー停止
+	function stopMessageEventListener() {
+		if (messageEventUnlisten) {
+			messageEventUnlisten();
+			messageEventUnlisten = null;
 		}
 	}
 
@@ -289,7 +289,7 @@
 		}
 
 		return () => {
-			stopMessagePolling();
+			stopMessageEventListener();
 			if (keyboardUnlisten) {
 				keyboardUnlisten();
 			}
@@ -300,7 +300,7 @@
 	});
 
 	onDestroy(() => {
-		stopMessagePolling();
+		stopMessageEventListener();
 		if (keyboardUnlisten) {
 			keyboardUnlisten();
 		}
