@@ -79,9 +79,7 @@ pub enum TcpError {
     SendFailed(String),
     InvalidAddress(String),
     ServerStartFailed(String),
-    ReceiveFailed(String),
     ConnectionNotFound(String),
-    InvalidConnectionId(String),
 }
 
 impl fmt::Display for TcpError {
@@ -91,9 +89,7 @@ impl fmt::Display for TcpError {
             TcpError::SendFailed(msg) => write!(f, "Send failed: {}", msg),
             TcpError::InvalidAddress(msg) => write!(f, "Invalid address: {}", msg),
             TcpError::ServerStartFailed(msg) => write!(f, "Server start failed: {}", msg),
-            TcpError::ReceiveFailed(msg) => write!(f, "Receive failed: {}", msg),
             TcpError::ConnectionNotFound(msg) => write!(f, "Connection not found: {}", msg),
-            TcpError::InvalidConnectionId(msg) => write!(f, "Invalid connection ID: {}", msg),
         }
     }
 }
@@ -155,7 +151,6 @@ pub async fn send_tcp_message(tcp_message: TcpMessage) -> Result<String, TcpErro
 
 // TCP接続管理のためのグローバル状態
 struct ConnectionData {
-    connection: TcpConnection,
     writer: Arc<Mutex<tokio::net::tcp::OwnedWriteHalf>>,
     messages: Arc<Mutex<Vec<TcpReceivedMessage>>>,
     receiver_handle: Option<JoinHandle<()>>,
@@ -334,7 +329,6 @@ pub async fn connect_tcp(request: TcpConnectionRequest) -> Result<TcpConnectionR
 
     // 接続データを作成
     let connection_data = ConnectionData {
-        connection: connection.clone(),
         writer: writer_arc,
         messages,
         receiver_handle: Some(receiver_handle),
@@ -389,7 +383,8 @@ pub async fn send_tcp_message_on_connection(message_request: TcpMessageOnConnect
         let send_timestamp = Utc::now().to_rfc3339();
 
         // メッセージにCRデリミタを追加
-        let message_with_cr = format!("{}", message_request.message);
+        let message_with_cr = format!("{}
+", message_request.message);
 
         // メッセージを送信
         let mut writer_guard = writer.lock().await;
