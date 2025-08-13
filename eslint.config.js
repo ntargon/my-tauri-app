@@ -12,7 +12,7 @@ const gitignorePath = fileURLToPath(new URL('./.gitignore', import.meta.url));
 export default ts.config(
 	includeIgnoreFile(gitignorePath),
 	{
-		ignores: ['src-tauri/**/*']
+		ignores: ['src-tauri/**/*', 'tools/**/*']
 	},
 	js.configs.recommended,
 	...ts.configs.recommended,
