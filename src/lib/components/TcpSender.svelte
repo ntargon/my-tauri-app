@@ -359,19 +359,19 @@
 				<div class="flex items-center space-x-2">
 					<span class="text-sm text-gray-400">Font:</span>
 					<div class="flex items-center space-x-2">
-						<span class="text-xs text-gray-500">12</span>
+						<span class="text-xs text-gray-500">8</span>
 						<div class="w-20">
 							<Slider
 								type="single"
 								bind:value={fontSizeSliderValue}
 								onValueChange={handleFontSizeChange}
-								min={12}
-								max={24}
+								min={8}
+								max={32}
 								step={1}
 								class="text-green-400"
 							/>
 						</div>
-						<span class="text-xs text-gray-500">24</span>
+						<span class="text-xs text-gray-500">32</span>
 						<span class="text-sm text-green-400">{currentFontSize}px</span>
 					</div>
 				</div>

@@ -37,8 +37,8 @@ export async function loadSettings(): Promise<void> {
 
 export async function saveFontSize(newFontSize: number): Promise<void> {
 	try {
-		if (newFontSize < 12 || newFontSize > 24) {
-			throw new Error('フォントサイズは12px〜24pxの範囲で指定してください');
+		if (newFontSize < 8 || newFontSize > 32) {
+			throw new Error('フォントサイズは8px〜32pxの範囲で指定してください');
 		}
 
 		const storeInstance = await getStore();
