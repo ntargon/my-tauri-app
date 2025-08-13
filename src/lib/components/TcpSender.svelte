@@ -43,6 +43,9 @@
 	// 履歴コンテナの参照
 	let historyContainer: HTMLDivElement;
 
+	// メッセージ入力の参照
+	let messageInput: HTMLTextAreaElement;
+
 	// フォントサイズ設定
 	let currentFontSize = $state(14);
 
@@ -64,6 +67,22 @@
 			setTimeout(() => {
 				historyContainer.scrollTop = historyContainer.scrollHeight;
 			}, 50);
+		}
+	}
+
+	// メッセージ入力にフォーカスする
+	function focusMessageInput() {
+		if (messageInput) {
+			setTimeout(() => {
+				messageInput.focus();
+			}, 100);
+		} else {
+			// DOM要素がまだ準備できていない場合、少し待ってリトライ
+			setTimeout(() => {
+				if (messageInput) {
+					messageInput.focus();
+				}
+			}, 200);
 		}
 	}
 
@@ -91,6 +110,7 @@
 				isConnected = true;
 				connectionResult = `接続確立: ${response.connection.host}:${response.connection.port}`;
 				setupMessageEventListener();
+				focusMessageInput(); // 接続後に自動フォーカス
 			} else {
 				connectionError = response.error || '接続に失敗しました';
 			}
@@ -319,6 +339,16 @@
 			currentFontSize = $fontSize;
 		}
 	});
+
+	// 接続状態変更時の自動フォーカス
+	$effect(() => {
+		if (isConnected && messageInput) {
+			// 接続確立後、少し待ってからフォーカス
+			setTimeout(() => {
+				focusMessageInput();
+			}, 150);
+		}
+	});
 </script>
 
 <div
@@ -473,6 +503,7 @@
 			<div class="flex space-x-2">
 				<div class="flex-shrink-0 self-end pb-2 text-green-400">$</div>
 				<textarea
+					bind:this={messageInput}
 					bind:value={message}
 					placeholder="Type message and press Enter to send..."
 					rows="1"
