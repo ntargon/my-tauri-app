@@ -59,6 +59,14 @@ pub struct TcpReceivedMessage {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
+pub struct TcpSendResult {
+    pub success: bool,
+    pub message: String,
+    pub timestamp: Option<String>,
+    pub error: Option<String>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
 pub struct TcpReceiveResult {
     pub success: bool,
     pub messages: Vec<TcpReceivedMessage>,
@@ -369,7 +377,7 @@ pub async fn disconnect_tcp(connection_id: String) -> Result<String, TcpError> {
 }
 
 #[tauri::command]
-pub async fn send_tcp_message_on_connection(message_request: TcpMessageOnConnection) -> Result<String, TcpError> {
+pub async fn send_tcp_message_on_connection(message_request: TcpMessageOnConnection) -> Result<TcpSendResult, TcpError> {
     let connections = CONNECTIONS.get_or_init(|| Arc::new(Mutex::new(HashMap::new())));
     let connections_guard = connections.lock().await;
     
@@ -377,27 +385,38 @@ pub async fn send_tcp_message_on_connection(message_request: TcpMessageOnConnect
         let writer = Arc::clone(&connection_data.writer);
         drop(connections_guard); // Release the lock early
 
+        // メッセージ送信時刻をRust側で生成
+        let send_timestamp = Utc::now().to_rfc3339();
+
         // メッセージにCRデリミタを追加
-        let message_with_cr = format!("{}
-", message_request.message);
+        let message_with_cr = format!("{}", message_request.message);
 
         // メッセージを送信
         let mut writer_guard = writer.lock().await;
         if let Err(e) = writer_guard.write_all(message_with_cr.as_bytes()).await {
-            return Err(TcpError::SendFailed(format!(
-                "Failed to send message: {}",
-                e
-            )));
+            return Ok(TcpSendResult {
+                success: false,
+                message: format!("Failed to send message: {}", e),
+                timestamp: Some(send_timestamp),
+                error: Some(format!("Send failed: {}", e)),
+            });
         }
 
         if let Err(e) = writer_guard.flush().await {
-            return Err(TcpError::SendFailed(format!(
-                "Failed to flush message: {}",
-                e
-            )));
+            return Ok(TcpSendResult {
+                success: false,
+                message: format!("Failed to flush message: {}", e),
+                timestamp: Some(send_timestamp),
+                error: Some(format!("Flush failed: {}", e)),
+            });
         }
 
-        Ok("Message sent successfully".to_string())
+        Ok(TcpSendResult {
+            success: true,
+            message: "Message sent successfully".to_string(),
+            timestamp: Some(send_timestamp),
+            error: None,
+        })
     } else {
         Err(TcpError::ConnectionNotFound(format!(
             "Connection with ID {} not found",

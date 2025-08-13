@@ -236,14 +236,8 @@ export class TcpClient {
 			};
 
 			// Tauriコマンドを呼び出し
-			const result = await invoke<string>('send_tcp_message_on_connection', { messageRequest });
-
-			return {
-				success: true,
-				message: result,
-				timestamp: new Date().toISOString(), // フォールバック用のタイムスタンプ
-				error: undefined
-			};
+			const result = await invoke<TcpSendResult>('send_tcp_message_on_connection', { messageRequest });
+			return result;
 		} catch (error) {
 			console.error('TCP送信エラー:', error);
 			return {
