@@ -1,4 +1,5 @@
 mod tcp;
+mod settings;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -22,7 +23,10 @@ pub fn run() {
         tcp::connect_tcp,
         tcp::disconnect_tcp,
         tcp::send_tcp_message_on_connection,
-        tcp::get_received_messages_from_connection
+        tcp::get_received_messages_from_connection,
+        settings::open_settings_window,
+        settings::close_settings_window,
+        settings::is_settings_window_open
     ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");

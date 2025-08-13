@@ -6,7 +6,8 @@
 	import type { TcpReceivedMessage, TcpConnection } from '$lib/types/tcp.js';
 	import { onMount, onDestroy } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
-	import { fontSize, loadSettings, saveFontSize } from '$lib/stores/settings.js';
+	import { fontSize, loadSettings } from '$lib/stores/settings.js';
+	import { SettingsWindow } from '$lib/settings-window.js';
 
 	// 接続管理の状態
 	let host = $state('localhost');
@@ -44,7 +45,6 @@
 
 	// フォントサイズ設定
 	let currentFontSize = $state(14);
-	let fontSizeSliderValue = $state(14);
 
 	// Rustから取得したRFC 3339タイムスタンプをフォーマット
 	function formatTimestampFromRust(timestamp: string): string {
@@ -67,15 +67,12 @@
 		}
 	}
 
-	// フォントサイズ変更ハンドラー
-	async function handleFontSizeChange(value: number) {
+	// 設定ウィンドウを開く
+	async function openSettings() {
 		try {
-			await saveFontSize(value);
-			currentFontSize = value;
+			await SettingsWindow.open();
 		} catch (error) {
-			console.error('フォントサイズの保存に失敗:', error);
-			// エラー時はスライダーを元の値に戻す
-			fontSizeSliderValue = currentFontSize;
+			console.error('設定ウィンドウを開く際にエラー:', error);
 		}
 	}
 
@@ -320,7 +317,6 @@
 	$effect(() => {
 		if ($fontSize !== currentFontSize) {
 			currentFontSize = $fontSize;
-			fontSizeSliderValue = $fontSize;
 		}
 	});
 </script>
@@ -355,26 +351,16 @@
 			</div>
 
 			<div class="flex items-center space-x-4">
-				<!-- フォントサイズ調整 -->
-				<div class="flex items-center space-x-2">
-					<span class="text-sm text-gray-400">Font:</span>
-					<div class="flex items-center space-x-2">
-						<span class="text-xs text-gray-500">8</span>
-						<div class="w-20">
-							<Slider
-								type="single"
-								bind:value={fontSizeSliderValue}
-								onValueChange={handleFontSizeChange}
-								min={8}
-								max={32}
-								step={1}
-								class="text-green-400"
-							/>
-						</div>
-						<span class="text-xs text-gray-500">32</span>
-						<span class="text-sm text-green-400">{currentFontSize}px</span>
-					</div>
-				</div>
+				<!-- 設定ボタン -->
+				<Button
+					size="sm"
+					variant="ghost"
+					onclick={openSettings}
+					class="text-gray-400 hover:bg-gray-700 hover:text-white"
+					title="設定を開く"
+				>
+					⚙️ 設定
+				</Button>
 			</div>
 
 			<div class="flex items-center space-x-3">
