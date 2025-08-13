@@ -107,7 +107,7 @@
 		const sentMessage: SentMessage = {
 			id: Date.now().toString(),
 			message: messageToSend,
-			timestamp: new Date().toLocaleTimeString(),
+			timestamp: new Date().toISOString(),
 			success: false
 		};
 
@@ -354,21 +354,14 @@
 				...sentMessages.map((m) => ({ type: 'sent', ...m })),
 				...receivedMessages.map((m) => ({ type: 'received', ...m }))
 			].sort((a, b) => {
-				const aTime =
-					a.type === 'sent'
-						? new Date(`1970-01-01 ${a.timestamp}`).getTime()
-						: new Date(a.timestamp).getTime();
-				const bTime =
-					b.type === 'sent'
-						? new Date(`1970-01-01 ${b.timestamp}`).getTime()
-						: new Date(b.timestamp).getTime();
-				return aTime - bTime;
+				// 両方ともISO形式のタイムスタンプなので直接比較
+				return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
 			})}
 
 			{#each allMessages as msg (msg.type === 'sent' ? `sent-${msg.id}` : `received-${msg.timestamp}-${msg.client_addr}`)}
 				{#if msg.type === 'sent'}
 					<div class="flex">
-						<span class="mr-2 text-blue-400">[{msg.timestamp}]</span>
+						<span class="mr-2 text-blue-400">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
 						<span class="mr-2 text-blue-300">→</span>
 						<span class="break-all text-white">{msg.message}</span>
 						{#if !msg.success}
