@@ -1,28 +1,30 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
+	import { Slider } from '$lib/components/ui/slider/index.js';
 	import { TcpClient } from '$lib/tcp-client.js';
 	import type { TcpReceivedMessage, TcpConnection } from '$lib/types/tcp.js';
 	import { onMount, onDestroy } from 'svelte';
 	import { listen } from '@tauri-apps/api/event';
+	import { fontSize, loadSettings, saveFontSize } from '$lib/stores/settings.js';
 
 	// 接続管理の状態
-	let host = 'localhost';
-	let port = 8080;
-	let connection: TcpConnection | null = null;
-	let isConnected = false;
-	let connecting = false;
-	let connectionError = '';
-	let connectionResult = '';
+	let host = $state('localhost');
+	let port = $state(8080);
+	let connection: TcpConnection | null = $state(null);
+	let isConnected = $state(false);
+	let connecting = $state(false);
+	let connectionError = $state('');
+	let connectionResult = $state('');
 
 	// 送信機能の状態
-	let message = '';
-	let sending = false;
-	let sendResult = '';
-	let sendError = '';
+	let message = $state('');
+	let sending = $state(false);
+	let sendResult = $state('');
+	let sendError = $state('');
 
 	// 受信機能の状態
-	let receivedMessages: TcpReceivedMessage[] = [];
+	let receivedMessages: TcpReceivedMessage[] = $state([]);
 	let messagePollingInterval: number | null = null;
 
 	// 送信履歴の状態
@@ -32,13 +34,17 @@
 		timestamp: string;
 		success: boolean;
 	}
-	let sentMessages: SentMessage[] = [];
+	let sentMessages: SentMessage[] = $state([]);
 
 	// キーボードイベントリスナーの管理
 	let keyboardUnlisten: (() => void) | null = null;
 
 	// 履歴コンテナの参照
 	let historyContainer: HTMLDivElement;
+
+	// フォントサイズ設定
+	let currentFontSize = $state(14);
+	let fontSizeSliderValue = $state(14);
 
 	// Rustから取得したRFC 3339タイムスタンプをフォーマット
 	function formatTimestampFromRust(timestamp: string): string {
@@ -58,6 +64,18 @@
 			setTimeout(() => {
 				historyContainer.scrollTop = historyContainer.scrollHeight;
 			}, 50);
+		}
+	}
+
+	// フォントサイズ変更ハンドラー
+	async function handleFontSizeChange(value: number) {
+		try {
+			await saveFontSize(value);
+			currentFontSize = value;
+		} catch (error) {
+			console.error('フォントサイズの保存に失敗:', error);
+			// エラー時はスライダーを元の値に戻す
+			fontSizeSliderValue = currentFontSize;
 		}
 	}
 
@@ -257,9 +275,16 @@
 	}
 
 	// クリーンアップ
-	onMount(async () => {
+	onMount(() => {
+		// 設定を読み込み
+		loadSettings().catch((error) => {
+			console.warn('設定の読み込みに失敗しました:', error);
+		});
+
 		// Tauriキーボードリスナーをセットアップ
-		await setupKeyboardListeners();
+		setupKeyboardListeners().catch((error) => {
+			console.warn('キーボードリスナーのセットアップに失敗しました:', error);
+		});
 
 		// フォールバック用ブラウザキーボードイベントリスナー追加
 		if (typeof window !== 'undefined') {
@@ -288,11 +313,22 @@
 	});
 
 	// リアルタイムバリデーション
-	$: connectionIsValid = TcpClient.validateConnection(host, port).valid;
-	$: sendIsValid = isConnected && message.trim().length > 0;
+	const connectionIsValid = $derived(TcpClient.validateConnection(host, port).valid);
+	const sendIsValid = $derived(isConnected && message.trim().length > 0);
+
+	// フォントサイズストアとの同期
+	$effect(() => {
+		if ($fontSize !== currentFontSize) {
+			currentFontSize = $fontSize;
+			fontSizeSliderValue = $fontSize;
+		}
+	});
 </script>
 
-<div class="flex h-screen flex-col bg-gray-900 font-mono text-green-400">
+<div
+	class="flex h-screen flex-col bg-gray-900 font-mono text-green-400"
+	style="--app-font-size: {currentFontSize}px;"
+>
 	<!-- ヘッダー: 接続情報 -->
 	<div class="flex-shrink-0 border-b border-gray-700 bg-gray-800 p-4">
 		<div class="flex items-center justify-between">
@@ -315,6 +351,29 @@
 						class="w-20 rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-white"
 						disabled={isConnected || connecting}
 					/>
+				</div>
+			</div>
+
+			<div class="flex items-center space-x-4">
+				<!-- フォントサイズ調整 -->
+				<div class="flex items-center space-x-2">
+					<span class="text-sm text-gray-400">Font:</span>
+					<div class="flex items-center space-x-2">
+						<span class="text-xs text-gray-500">12</span>
+						<div class="w-20">
+							<Slider
+								type="single"
+								bind:value={fontSizeSliderValue}
+								onValueChange={handleFontSizeChange}
+								min={12}
+								max={24}
+								step={1}
+								class="text-green-400"
+							/>
+						</div>
+						<span class="text-xs text-gray-500">24</span>
+						<span class="text-sm text-green-400">{currentFontSize}px</span>
+					</div>
 				</div>
 			</div>
 
@@ -362,7 +421,11 @@
 	</div>
 
 	<!-- メッセージ履歴エリア -->
-	<div class="flex-1 space-y-1 overflow-y-auto p-4" bind:this={historyContainer}>
+	<div
+		class="flex-1 space-y-1 overflow-y-auto p-4"
+		bind:this={historyContainer}
+		style="font-size: var(--app-font-size);"
+	>
 		{#if isConnected}
 			<!-- 統合されたメッセージ履歴 -->
 			{@const allMessages = [
@@ -373,23 +436,22 @@
 				return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
 			})}
 
-			{#each allMessages as msg (msg.type === 'sent' ? `sent-${msg.id}` : `received-${msg.timestamp}-${msg.client_addr}`)}
+			{#each allMessages as msg (msg.type === 'sent' ? `sent-${(msg as any).id}` : `received-${msg.timestamp}-${(msg as any).client_addr}`)}
 				{#if msg.type === 'sent'}
 					<div class="flex">
 						<span class="mr-2 text-blue-400">[{formatTimestampFromRust(msg.timestamp)}]</span>
 						<span class="mr-2 text-blue-300">→</span>
 						<span class="break-all text-white">{msg.message}</span>
-						{#if !msg.success}
+						{#if !(msg as any).success}
 							<span class="ml-2 text-red-400">(FAILED)</span>
 						{/if}
 					</div>
 				{:else}
 					<div class="flex">
-						<span class="mr-2 text-green-400">[{formatTimestampFromRust(msg.timestamp)}]</span
-						>
+						<span class="mr-2 text-green-400">[{formatTimestampFromRust(msg.timestamp)}]</span>
 						<span class="mr-2 text-green-300">←</span>
 						<span class="break-all text-green-100">{msg.message}</span>
-						<span class="ml-2 text-xs text-gray-400">({msg.client_addr})</span>
+						<span class="ml-2 text-xs text-gray-400">({(msg as any).client_addr})</span>
 					</div>
 				{/if}
 			{/each}
@@ -421,8 +483,8 @@
 					placeholder="Type message and press Shift+Enter to send..."
 					rows="1"
 					class="flex-1 resize-none rounded border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none"
-					on:keydown={handleKeydown}
-					style="field-sizing: content; min-height: 40px;"
+					onkeydown={handleKeydown}
+					style="field-sizing: content; min-height: 40px; font-size: var(--app-font-size);"
 				></textarea>
 				<Button
 					onclick={validateAndSend}

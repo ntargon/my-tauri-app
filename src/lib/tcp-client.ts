@@ -236,7 +236,9 @@ export class TcpClient {
 			};
 
 			// Tauriコマンドを呼び出し
-			const result = await invoke<TcpSendResult>('send_tcp_message_on_connection', { messageRequest });
+			const result = await invoke<TcpSendResult>('send_tcp_message_on_connection', {
+				messageRequest
+			});
 			return result;
 		} catch (error) {
 			console.error('TCP送信エラー:', error);
