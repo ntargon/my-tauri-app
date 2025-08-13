@@ -99,8 +99,39 @@ npx shadcn-svelte@latest add button
 設定ファイル: `components.json`
 コンポーネント配置: `src/lib/components/ui/`
 
+## Debug Tools
+
+### TCP テストサーバー
+
+TCP通信機能のテスト用サーバーが `tools/tcp-server/` に用意されています：
+
+```bash
+# TCPテストサーバー起動
+cd tools/tcp-server && cargo run
+
+# または、プロジェクトルートから
+cd tools/tcp-server
+cargo run
+```
+
+**サーバー仕様**：
+- アドレス: `127.0.0.1:8080` (localhost:8080)
+- プロトコル: TCP
+- 機能: エコーサーバー（受信したメッセージをそのまま返信）
+- 停止: Ctrl+C
+
+**デバッグ手順**：
+1. TCPサーバー起動: `cd tools/tcp-server && cargo run`
+2. Tauriアプリ起動: `yarn tauri:dev`
+3. アプリでlocalhost:8080に接続してテスト
+4. ショートカットキー動作確認:
+   - Ctrl+N: TCP接続
+   - Ctrl+I: TCP切断
+   - Shift+Enter: メッセージ送信
+
 ## Notes
 
 - Tauri統合済み、デスクトップアプリとして動作可能
 - WebアプリとしてもTauriアプリとしても動作可能
 - shadcn-svelte導入済み、UIコンポーネントライブラリが利用可能
+- TCP通信機能実装済み（接続管理、メッセージ送受信、ショートカットキー対応）

@@ -13,6 +13,7 @@
 	import { TcpClient } from '$lib/tcp-client.js';
 	import type { TcpReceivedMessage, TcpConnection } from '$lib/types/tcp.js';
 	import { onMount, onDestroy } from 'svelte';
+	import { listen } from '@tauri-apps/api/event';
 
 	// 接続管理の状態
 	let host = 'localhost';
@@ -32,6 +33,9 @@
 	// 受信機能の状態
 	let receivedMessages: TcpReceivedMessage[] = [];
 	let messagePollingInterval: number | null = null;
+
+	// キーボードイベントリスナーの管理
+	let keyboardUnlisten: (() => void) | null = null;
 
 	async function connectTcp() {
 		if (connecting || isConnected) return;
@@ -169,15 +173,77 @@
 		}
 	}
 
+	// Tauriキーボードショートカットハンドラー
+	async function setupKeyboardListeners() {
+		try {
+			keyboardUnlisten = await listen('tauri://menu', (event) => {
+				// Tauriのメニューイベント処理
+				const payload = event.payload as any;
+				if (payload.id === 'connect') {
+					if (!isConnected && !connecting && connectionIsValid) {
+						connectTcp();
+					}
+				} else if (payload.id === 'disconnect') {
+					if (isConnected && !connecting) {
+						disconnectTcp();
+					}
+				}
+			});
+		} catch (error) {
+			console.warn('キーボードリスナーのセットアップに失敗しました:', error);
+		}
+	}
+
+	// フォールバック用のブラウザキーボードハンドラー
+	function handleGlobalKeydown(event: KeyboardEvent) {
+		// Ctrl+N: 接続
+		if (event.ctrlKey && event.key === 'n') {
+			event.preventDefault();
+			if (!isConnected && !connecting && connectionIsValid) {
+				connectTcp();
+			}
+			return;
+		}
+
+		// Ctrl+I: 切断
+		if (event.ctrlKey && event.key === 'i') {
+			event.preventDefault();
+			if (isConnected && !connecting) {
+				disconnectTcp();
+			}
+			return;
+		}
+	}
+
 	// クリーンアップ
-	onMount(() => {
+	onMount(async () => {
+		// Tauriキーボードリスナーをセットアップ
+		await setupKeyboardListeners();
+		
+		// フォールバック用ブラウザキーボードイベントリスナー追加
+		if (typeof window !== 'undefined') {
+			window.addEventListener('keydown', handleGlobalKeydown);
+		}
+
 		return () => {
 			stopMessagePolling();
+			if (keyboardUnlisten) {
+				keyboardUnlisten();
+			}
+			if (typeof window !== 'undefined') {
+				window.removeEventListener('keydown', handleGlobalKeydown);
+			}
 		};
 	});
 
 	onDestroy(() => {
 		stopMessagePolling();
+		if (keyboardUnlisten) {
+			keyboardUnlisten();
+		}
+		if (typeof window !== 'undefined') {
+			window.removeEventListener('keydown', handleGlobalKeydown);
+		}
 	});
 
 	// リアルタイムバリデーション
@@ -190,7 +256,9 @@
 	<Card class="w-full max-w-2xl">
 		<CardHeader>
 			<CardTitle>TCP接続管理</CardTitle>
-			<CardDescription>TCP接続を確立してメッセージの送受信を行います</CardDescription>
+			<CardDescription
+				>TCP接続を確立してメッセージの送受信を行います • Ctrl+N：接続 • Ctrl+I：切断</CardDescription
+			>
 		</CardHeader>
 		<CardContent class="space-y-4">
 			<div class="grid grid-cols-2 gap-4">
@@ -226,10 +294,12 @@
 						disabled={!connectionIsValid || connecting}
 						class="flex-1"
 					>
-						{connecting ? '接続中...' : 'TCP接続'}
+						{connecting ? '接続中...' : 'TCP接続 (Ctrl+N)'}
 					</Button>
 				{:else}
-					<Button onclick={disconnectTcp} variant="destructive" class="flex-1">接続切断</Button>
+					<Button onclick={disconnectTcp} variant="destructive" class="flex-1"
+						>接続切断 (Ctrl+I)</Button
+					>
 				{/if}
 				<Badge variant={isConnected ? 'default' : 'secondary'}>
 					{isConnected ? '接続中' : '切断中'}
