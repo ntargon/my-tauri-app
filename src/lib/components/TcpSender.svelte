@@ -2,7 +2,6 @@
 	import { Button } from '$lib/components/ui/button/index.js';
 	import { Input } from '$lib/components/ui/input/index.js';
 	import { Label } from '$lib/components/ui/label/index.js';
-	import { Textarea } from '$lib/components/ui/textarea/index.js';
 	import {
 		Card,
 		CardContent,
@@ -127,6 +126,18 @@
 		sendError = '';
 		connectionResult = '';
 		connectionError = '';
+	}
+
+	function handleKeydown(event: KeyboardEvent) {
+		if (event.key === 'Enter' && event.shiftKey) {
+			event.preventDefault();
+
+			if (!isConnected || !message.trim() || sending) {
+				return;
+			}
+
+			validateAndSend();
+		}
 	}
 
 	// メッセージポーリング開始
@@ -267,15 +278,17 @@
 			<CardContent class="space-y-4">
 				<div class="space-y-2">
 					<Label for="message">メッセージ</Label>
-					<Textarea
+					<textarea
 						id="message"
 						bind:value={message}
-						placeholder="送信するメッセージを入力してください..."
+						placeholder="送信するメッセージを入力してください（Shift+Enterで送信）..."
 						rows="4"
+						class="flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
 						on:input={clearResults}
-					/>
+						on:keydown={handleKeydown}
+					></textarea>
 					<p class="text-sm text-muted-foreground">
-						メッセージの末尾に自動的にCR（\r）が追加されます
+						メッセージの末尾に自動的にCR（\r）が追加されます • Shift+Enterで送信、Enterで改行
 					</p>
 				</div>
 
