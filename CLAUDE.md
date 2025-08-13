@@ -129,7 +129,7 @@ cargo run
 4. ショートカットキー動作確認:
    - Ctrl+N: TCP接続
    - Ctrl+I: TCP切断
-   - Shift+Enter: メッセージ送信
+   - Enter: メッセージ送信
 
 ## Notes
 

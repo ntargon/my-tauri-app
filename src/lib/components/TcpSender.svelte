@@ -184,7 +184,7 @@
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
-		if (event.key === 'Enter' && event.shiftKey) {
+		if (event.key === 'Enter' && !event.shiftKey) {
 			event.preventDefault();
 
 			if (!isConnected || !message.trim() || sending) {
@@ -449,7 +449,7 @@
 				<div class="text-center text-sm">
 					Enter host:port above and click Connect to start<br />
 					<span class="text-xs text-gray-600"
-						>Shortcuts: Ctrl+N (Connect), Ctrl+I (Disconnect), Shift+Enter (Send)</span
+						>Shortcuts: Ctrl+N (Connect), Ctrl+I (Disconnect), Enter (Send), Shift+Enter (New line)</span
 					>
 				</div>
 			</div>
@@ -474,7 +474,7 @@
 				<div class="flex-shrink-0 self-end pb-2 text-green-400">$</div>
 				<textarea
 					bind:value={message}
-					placeholder="Type message and press Shift+Enter to send..."
+					placeholder="Type message and press Enter to send..."
 					rows="1"
 					class="flex-1 resize-none rounded border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none"
 					onkeydown={handleKeydown}
@@ -487,7 +487,7 @@
 					size="sm"
 					class="self-end bg-green-600 text-white hover:bg-green-700"
 					aria-label="Send message"
-					title="Send message (Shift+Enter)"
+					title="Send message (Enter)"
 				>
 					{sending ? 'Sending...' : 'Send'}
 				</Button>
