@@ -7,6 +7,7 @@ export interface TcpMessage {
 export interface TcpSendResult {
 	success: boolean;
 	message: string;
+	timestamp?: string; // 送信成功時のタイムスタンプ（RFC 3339形式）
 	error?: string;
 }
 

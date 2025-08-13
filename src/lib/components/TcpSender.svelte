@@ -40,6 +40,18 @@
 	// 履歴コンテナの参照
 	let historyContainer: HTMLDivElement;
 
+	// Rustから取得したRFC 3339タイムスタンプをフォーマット
+	function formatTimestampFromRust(timestamp: string): string {
+		// RFC 3339形式: "2025-08-13T10:46:22.123Z" から時刻部分を抽出
+		const match = timestamp.match(/T(\d{2}):(\d{2}):(\d{2})\.(\d{3})/);
+		if (match) {
+			const [, hour, minute, second, millisecond] = match;
+			return `${hour}:${minute}:${second}.${millisecond}`;
+		}
+		// フォールバック: 通常のDate変換
+		return new Date(timestamp).toLocaleTimeString('ja-JP', { hour12: false });
+	}
+
 	// 自動スクロール機能
 	function scrollToBottom() {
 		if (historyContainer) {
@@ -107,7 +119,7 @@
 		const sentMessage: SentMessage = {
 			id: Date.now().toString(),
 			message: messageToSend,
-			timestamp: new Date().toISOString(),
+			timestamp: '', // Rustから取得するタイムスタンプで後から設定
 			success: false
 		};
 
@@ -116,16 +128,19 @@
 
 			if (response.success) {
 				sentMessage.success = true;
+				sentMessage.timestamp = response.timestamp || new Date().toISOString(); // Rustからのタイムスタンプを使用、フォールバックでJavaScript時刻
 				sentMessages = [...sentMessages, sentMessage];
 				sendResult = response.message;
 				message = ''; // 成功時はメッセージをクリア
 				scrollToBottom();
 			} else {
+				sentMessage.timestamp = response.timestamp || new Date().toISOString(); // 失敗時もタイムスタンプを設定
 				sentMessages = [...sentMessages, sentMessage];
 				sendError = response.error || '送信に失敗しました';
 				scrollToBottom();
 			}
 		} catch (e) {
+			sentMessage.timestamp = new Date().toISOString(); // catch時はJavaScript時刻でフォールバック
 			sentMessages = [...sentMessages, sentMessage];
 			sendError = e instanceof Error ? e.message : '予期しないエラーが発生しました';
 			scrollToBottom();
@@ -354,35 +369,14 @@
 				...sentMessages.map((m) => ({ type: 'sent', ...m })),
 				...receivedMessages.map((m) => ({ type: 'received', ...m }))
 			].sort((a, b) => {
-				// 時間順でソート（古い→新しい）
-				const timeDiff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
-
-				// 1秒以内の近いタイミングでは送信メッセージを先に表示（送信→受信の順）
-				if (Math.abs(timeDiff) <= 1000) {
-					// 1秒以内
-					if (a.type === 'sent' && b.type === 'received') return -1;
-					if (a.type === 'received' && b.type === 'sent') return 1;
-					// 同じタイプの場合の安定ソート
-					if (a.type === 'sent' && b.type === 'sent') {
-						const aSent = a as SentMessage & { type: 'sent' };
-						const bSent = b as SentMessage & { type: 'sent' };
-						return aSent.id.localeCompare(bSent.id);
-					}
-					if (a.type === 'received' && b.type === 'received') {
-						const aReceived = a as TcpReceivedMessage & { type: 'received' };
-						const bReceived = b as TcpReceivedMessage & { type: 'received' };
-						const clientCompare = aReceived.client_addr.localeCompare(bReceived.client_addr);
-						return clientCompare !== 0 ? clientCompare : a.timestamp.localeCompare(b.timestamp);
-					}
-				}
-
-				return timeDiff;
+				// シンプルなタイムスタンプソート（古い→新しい）
+				return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
 			})}
 
 			{#each allMessages as msg (msg.type === 'sent' ? `sent-${msg.id}` : `received-${msg.timestamp}-${msg.client_addr}`)}
 				{#if msg.type === 'sent'}
 					<div class="flex">
-						<span class="mr-2 text-blue-400">[{new Date(msg.timestamp).toLocaleTimeString()}]</span>
+						<span class="mr-2 text-blue-400">[{formatTimestampFromRust(msg.timestamp)}]</span>
 						<span class="mr-2 text-blue-300">→</span>
 						<span class="break-all text-white">{msg.message}</span>
 						{#if !msg.success}
@@ -391,7 +385,7 @@
 					</div>
 				{:else}
 					<div class="flex">
-						<span class="mr-2 text-green-400">[{new Date(msg.timestamp).toLocaleTimeString()}]</span
+						<span class="mr-2 text-green-400">[{formatTimestampFromRust(msg.timestamp)}]</span
 						>
 						<span class="mr-2 text-green-300">←</span>
 						<span class="break-all text-green-100">{msg.message}</span>

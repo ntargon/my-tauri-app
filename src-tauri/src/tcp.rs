@@ -7,7 +7,7 @@ use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 use tokio::task::JoinHandle;
-use chrono::Local;
+use chrono::{Local, Utc};
 use uuid::Uuid;
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -258,7 +258,7 @@ async fn handle_tcp_client(
                 if !message.is_empty() {
                     let received_msg = TcpReceivedMessage {
                         message: message.to_string(),
-                        timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                        timestamp: Utc::now().to_rfc3339(),
                         client_addr: client_addr.clone(),
                     };
                     
@@ -451,7 +451,7 @@ async fn handle_connection_receiver(
                 if !message.is_empty() {
                     let received_msg = TcpReceivedMessage {
                         message: message.to_string(),
-                        timestamp: Local::now().format("%Y-%m-%d %H:%M:%S").to_string(),
+                        timestamp: Utc::now().to_rfc3339(),
                         client_addr: format!("Connection {}", connection_id),
                     };
                     

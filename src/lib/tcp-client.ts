@@ -240,7 +240,9 @@ export class TcpClient {
 
 			return {
 				success: true,
-				message: result
+				message: result,
+				timestamp: new Date().toISOString(), // フォールバック用のタイムスタンプ
+				error: undefined
 			};
 		} catch (error) {
 			console.error('TCP送信エラー:', error);
