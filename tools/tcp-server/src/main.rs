@@ -2,7 +2,7 @@ use anyhow::Result;
 use chrono::Local;
 use clap::Parser;
 use std::sync::Arc;
-use tokio::io::{AsyncBufReadExt, BufReader};
+use tokio::io::{AsyncBufReadExt, AsyncWriteExt, BufReader};
 use tokio::net::{TcpListener, TcpStream};
 use tokio::sync::Mutex;
 
@@ -81,7 +81,8 @@ async fn handle_client(
 		);
 	}
 
-	let mut reader = BufReader::new(stream);
+	let (reader, mut writer) = stream.into_split();
+	let mut reader = BufReader::new(reader);
 	let mut line = String::new();
 
 	loop {
@@ -100,6 +101,8 @@ async fn handle_client(
 				if !message.is_empty() {
 					let mut stats = stats.lock().await;
 					stats.messages_received += 1;
+					let current_time = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+					
 					println!(
 						"[{}] Message #{} from {}: \"{}\"",
 						Local::now().format("%H:%M:%S"),
@@ -107,6 +110,29 @@ async fn handle_client(
 						client_addr,
 						message
 					);
+
+					// エコーレスポンス: 受信メッセージと現在時刻を返送
+					let response = format!("Echo: {} (Server time: {})\r\n", message, current_time);
+					
+					if let Err(e) = writer.write_all(response.as_bytes()).await {
+						eprintln!(
+							"[{}] Error writing to {}: {}",
+							Local::now().format("%H:%M:%S"),
+							client_addr,
+							e
+						);
+						break;
+					}
+					
+					if let Err(e) = writer.flush().await {
+						eprintln!(
+							"[{}] Error flushing to {}: {}",
+							Local::now().format("%H:%M:%S"),
+							client_addr,
+							e
+						);
+						break;
+					}
 				}
 			}
 			Err(e) => {

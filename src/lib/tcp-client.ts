@@ -1,5 +1,13 @@
 import { invoke } from '@tauri-apps/api/core';
-import type { TcpMessage, TcpSendResult } from './types/tcp.js';
+import type {
+	TcpMessage,
+	TcpSendResult,
+	TcpServerConfig,
+	TcpReceiveResult,
+	TcpConnectionRequest,
+	TcpConnectionResult,
+	TcpMessageOnConnection
+} from './types/tcp.js';
 
 export class TcpClient {
 	/**
@@ -75,5 +83,191 @@ export class TcpClient {
 		}
 
 		return { valid: true };
+	}
+
+	/**
+	 * TCPサーバーを開始します
+	 */
+	static async startServer(host: string, port: number): Promise<TcpSendResult> {
+		try {
+			const config: TcpServerConfig = {
+				host: host.trim(),
+				port
+			};
+
+			// 入力値の検証
+			const validation = TcpClient.validateConnection(host, port);
+			if (!validation.valid) {
+				return {
+					success: false,
+					message: '',
+					error: validation.error
+				};
+			}
+
+			// Tauriコマンドを呼び出し
+			const result = await invoke<string>('start_tcp_server', { config });
+
+			return {
+				success: true,
+				message: result
+			};
+		} catch (error) {
+			console.error('TCPサーバー開始エラー:', error);
+			return {
+				success: false,
+				message: '',
+				error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+			};
+		}
+	}
+
+	/**
+	 * TCPサーバーを停止します
+	 */
+	static async stopServer(): Promise<TcpSendResult> {
+		try {
+			const result = await invoke<string>('stop_tcp_server');
+
+			return {
+				success: true,
+				message: result
+			};
+		} catch (error) {
+			console.error('TCPサーバー停止エラー:', error);
+			return {
+				success: false,
+				message: '',
+				error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+			};
+		}
+	}
+
+	/**
+	 * 受信したメッセージを取得します
+	 */
+	static async getReceivedMessages(): Promise<TcpReceiveResult> {
+		try {
+			const result = await invoke<TcpReceiveResult>('get_received_messages');
+			return result;
+		} catch (error) {
+			console.error('メッセージ取得エラー:', error);
+			return {
+				success: false,
+				messages: [],
+				error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+			};
+		}
+	}
+
+	/**
+	 * TCP接続を確立します
+	 */
+	static async connect(host: string, port: number): Promise<TcpConnectionResult> {
+		try {
+			const request: TcpConnectionRequest = {
+				host: host.trim(),
+				port
+			};
+
+			// 入力値の検証
+			const validation = TcpClient.validateConnection(host, port);
+			if (!validation.valid) {
+				return {
+					success: false,
+					connection: undefined,
+					error: validation.error
+				};
+			}
+
+			// Tauriコマンドを呼び出し
+			const result = await invoke<TcpConnectionResult>('connect_tcp', { request });
+			return result;
+		} catch (error) {
+			console.error('TCP接続エラー:', error);
+			return {
+				success: false,
+				connection: undefined,
+				error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+			};
+		}
+	}
+
+	/**
+	 * TCP接続を切断します
+	 */
+	static async disconnect(connectionId: string): Promise<TcpSendResult> {
+		try {
+			const result = await invoke<string>('disconnect_tcp', { connectionId });
+
+			return {
+				success: true,
+				message: result
+			};
+		} catch (error) {
+			console.error('TCP切断エラー:', error);
+			return {
+				success: false,
+				message: '',
+				error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+			};
+		}
+	}
+
+	/**
+	 * 接続上でメッセージを送信します
+	 */
+	static async sendMessageOnConnection(
+		connectionId: string,
+		message: string
+	): Promise<TcpSendResult> {
+		try {
+			if (!message.trim()) {
+				return {
+					success: false,
+					message: '',
+					error: 'メッセージは必須です'
+				};
+			}
+
+			const messageRequest: TcpMessageOnConnection = {
+				connection_id: connectionId,
+				message: message.trim()
+			};
+
+			// Tauriコマンドを呼び出し
+			const result = await invoke<string>('send_tcp_message_on_connection', { messageRequest });
+
+			return {
+				success: true,
+				message: result
+			};
+		} catch (error) {
+			console.error('TCP送信エラー:', error);
+			return {
+				success: false,
+				message: '',
+				error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+			};
+		}
+	}
+
+	/**
+	 * 接続から受信したメッセージを取得します
+	 */
+	static async getReceivedMessagesFromConnection(connectionId: string): Promise<TcpReceiveResult> {
+		try {
+			const result = await invoke<TcpReceiveResult>('get_received_messages_from_connection', {
+				connectionId
+			});
+			return result;
+		} catch (error) {
+			console.error('メッセージ取得エラー:', error);
+			return {
+				success: false,
+				messages: [],
+				error: error instanceof Error ? error.message : '不明なエラーが発生しました'
+			};
+		}
 	}
 }

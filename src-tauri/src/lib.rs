@@ -13,7 +13,16 @@ pub fn run() {
       }
       Ok(())
     })
-    .invoke_handler(tauri::generate_handler![tcp::send_tcp_message])
+    .invoke_handler(tauri::generate_handler![
+        tcp::send_tcp_message,
+        tcp::start_tcp_server,
+        tcp::stop_tcp_server,
+        tcp::get_received_messages,
+        tcp::connect_tcp,
+        tcp::disconnect_tcp,
+        tcp::send_tcp_message_on_connection,
+        tcp::get_received_messages_from_connection
+    ])
     .run(tauri::generate_context!())
     .expect("error while running tauri application");
 }
