@@ -354,8 +354,29 @@
 				...sentMessages.map((m) => ({ type: 'sent', ...m })),
 				...receivedMessages.map((m) => ({ type: 'received', ...m }))
 			].sort((a, b) => {
-				// 両方ともISO形式のタイムスタンプなので直接比較
-				return new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+				// 時間順でソート（古い→新しい）
+				const timeDiff = new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime();
+
+				// 1秒以内の近いタイミングでは送信メッセージを先に表示（送信→受信の順）
+				if (Math.abs(timeDiff) <= 1000) {
+					// 1秒以内
+					if (a.type === 'sent' && b.type === 'received') return -1;
+					if (a.type === 'received' && b.type === 'sent') return 1;
+					// 同じタイプの場合の安定ソート
+					if (a.type === 'sent' && b.type === 'sent') {
+						const aSent = a as SentMessage & { type: 'sent' };
+						const bSent = b as SentMessage & { type: 'sent' };
+						return aSent.id.localeCompare(bSent.id);
+					}
+					if (a.type === 'received' && b.type === 'received') {
+						const aReceived = a as TcpReceivedMessage & { type: 'received' };
+						const bReceived = b as TcpReceivedMessage & { type: 'received' };
+						const clientCompare = aReceived.client_addr.localeCompare(bReceived.client_addr);
+						return clientCompare !== 0 ? clientCompare : a.timestamp.localeCompare(b.timestamp);
+					}
+				}
+
+				return timeDiff;
 			})}
 
 			{#each allMessages as msg (msg.type === 'sent' ? `sent-${msg.id}` : `received-${msg.timestamp}-${msg.client_addr}`)}
