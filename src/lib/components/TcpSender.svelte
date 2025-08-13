@@ -1,14 +1,5 @@
 <script lang="ts">
 	import { Button } from '$lib/components/ui/button/index.js';
-	import { Input } from '$lib/components/ui/input/index.js';
-	import { Label } from '$lib/components/ui/label/index.js';
-	import {
-		Card,
-		CardContent,
-		CardDescription,
-		CardHeader,
-		CardTitle
-	} from '$lib/components/ui/card/index.js';
 	import { Badge } from '$lib/components/ui/badge/index.js';
 	import { TcpClient } from '$lib/tcp-client.js';
 	import type { TcpReceivedMessage, TcpConnection } from '$lib/types/tcp.js';
@@ -34,8 +25,29 @@
 	let receivedMessages: TcpReceivedMessage[] = [];
 	let messagePollingInterval: number | null = null;
 
+	// 送信履歴の状態
+	interface SentMessage {
+		id: string;
+		message: string;
+		timestamp: string;
+		success: boolean;
+	}
+	let sentMessages: SentMessage[] = [];
+
 	// キーボードイベントリスナーの管理
 	let keyboardUnlisten: (() => void) | null = null;
+
+	// 履歴コンテナの参照
+	let historyContainer: HTMLDivElement;
+
+	// 自動スクロール機能
+	function scrollToBottom() {
+		if (historyContainer) {
+			setTimeout(() => {
+				historyContainer.scrollTop = historyContainer.scrollHeight;
+			}, 50);
+		}
+	}
 
 	async function connectTcp() {
 		if (connecting || isConnected) return;
@@ -80,6 +92,7 @@
 			connection = null;
 			isConnected = false;
 			receivedMessages = [];
+			sentMessages = [];
 		}
 	}
 
@@ -90,17 +103,32 @@
 		sendResult = '';
 		sendError = '';
 
+		const messageToSend = message;
+		const sentMessage: SentMessage = {
+			id: Date.now().toString(),
+			message: messageToSend,
+			timestamp: new Date().toLocaleTimeString(),
+			success: false
+		};
+
 		try {
-			const response = await TcpClient.sendMessageOnConnection(connection.id, message);
+			const response = await TcpClient.sendMessageOnConnection(connection.id, messageToSend);
 
 			if (response.success) {
+				sentMessage.success = true;
+				sentMessages = [...sentMessages, sentMessage];
 				sendResult = response.message;
 				message = ''; // 成功時はメッセージをクリア
+				scrollToBottom();
 			} else {
+				sentMessages = [...sentMessages, sentMessage];
 				sendError = response.error || '送信に失敗しました';
+				scrollToBottom();
 			}
 		} catch (e) {
+			sentMessages = [...sentMessages, sentMessage];
 			sendError = e instanceof Error ? e.message : '予期しないエラーが発生しました';
+			scrollToBottom();
 		} finally {
 			sending = false;
 		}
@@ -123,13 +151,6 @@
 		}
 
 		sendMessage();
-	}
-
-	function clearResults() {
-		sendResult = '';
-		sendError = '';
-		connectionResult = '';
-		connectionError = '';
 	}
 
 	function handleKeydown(event: KeyboardEvent) {
@@ -157,7 +178,12 @@
 			try {
 				const response = await TcpClient.getReceivedMessagesFromConnection(connection.id);
 				if (response.success) {
+					const oldLength = receivedMessages.length;
 					receivedMessages = response.messages;
+					// 新しいメッセージが追加された場合のみスクロール
+					if (response.messages.length > oldLength) {
+						scrollToBottom();
+					}
 				}
 			} catch (e) {
 				console.error('メッセージ取得エラー:', e);
@@ -178,7 +204,7 @@
 		try {
 			keyboardUnlisten = await listen('tauri://menu', (event) => {
 				// Tauriのメニューイベント処理
-				const payload = event.payload as any;
+				const payload = event.payload as { id: string };
 				if (payload.id === 'connect') {
 					if (!isConnected && !connecting && connectionIsValid) {
 						connectTcp();
@@ -219,7 +245,7 @@
 	onMount(async () => {
 		// Tauriキーボードリスナーをセットアップ
 		await setupKeyboardListeners();
-		
+
 		// フォールバック用ブラウザキーボードイベントリスナー追加
 		if (typeof window !== 'undefined') {
 			window.addEventListener('keydown', handleGlobalKeydown);
@@ -251,183 +277,154 @@
 	$: sendIsValid = isConnected && message.trim().length > 0;
 </script>
 
-<div class="space-y-6">
-	<!-- TCP接続管理 -->
-	<Card class="w-full max-w-2xl">
-		<CardHeader>
-			<CardTitle>TCP接続管理</CardTitle>
-			<CardDescription
-				>TCP接続を確立してメッセージの送受信を行います • Ctrl+N：接続 • Ctrl+I：切断</CardDescription
-			>
-		</CardHeader>
-		<CardContent class="space-y-4">
-			<div class="grid grid-cols-2 gap-4">
-				<div class="space-y-2">
-					<Label for="host">ホスト</Label>
-					<Input
-						id="host"
+<div class="flex h-screen flex-col bg-gray-900 font-mono text-green-400">
+	<!-- ヘッダー: 接続情報 -->
+	<div class="flex-shrink-0 border-b border-gray-700 bg-gray-800 p-4">
+		<div class="flex items-center justify-between">
+			<div class="flex items-center space-x-4">
+				<h1 class="text-lg font-bold">TCP Terminal</h1>
+				<div class="flex items-center space-x-2">
+					<input
 						bind:value={host}
-						placeholder="localhost または IPアドレス"
-						on:input={clearResults}
+						placeholder="host"
+						class="w-24 rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-white"
 						disabled={isConnected || connecting}
 					/>
-				</div>
-				<div class="space-y-2">
-					<Label for="port">ポート</Label>
-					<Input
-						id="port"
+					<span class="text-gray-400">:</span>
+					<input
 						type="number"
 						bind:value={port}
+						placeholder="port"
 						min="1"
 						max="65535"
-						placeholder="8080"
-						on:input={clearResults}
+						class="w-20 rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-white"
 						disabled={isConnected || connecting}
 					/>
 				</div>
 			</div>
 
-			<div class="flex gap-2">
+			<div class="flex items-center space-x-3">
+				<Badge
+					variant={isConnected ? 'default' : 'secondary'}
+					class={isConnected ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'}
+				>
+					{isConnected ? 'CONNECTED' : 'DISCONNECTED'}
+				</Badge>
+
 				{#if !isConnected}
 					<Button
+						size="sm"
 						onclick={validateAndConnect}
 						disabled={!connectionIsValid || connecting}
-						class="flex-1"
+						class="bg-blue-600 text-white hover:bg-blue-700"
 					>
-						{connecting ? '接続中...' : 'TCP接続 (Ctrl+N)'}
+						{connecting ? 'Connecting...' : 'Connect'}
 					</Button>
 				{:else}
-					<Button onclick={disconnectTcp} variant="destructive" class="flex-1"
-						>接続切断 (Ctrl+I)</Button
-					>
-				{/if}
-				<Badge variant={isConnected ? 'default' : 'secondary'}>
-					{isConnected ? '接続中' : '切断中'}
-				</Badge>
-			</div>
-
-			{#if connectionResult}
-				<div class="rounded-md border border-green-200 bg-green-50 p-3">
-					<p class="text-sm font-medium text-green-800">成功</p>
-					<p class="text-sm text-green-700">{connectionResult}</p>
-				</div>
-			{/if}
-
-			{#if connectionError}
-				<div class="rounded-md border border-red-200 bg-red-50 p-3">
-					<p class="text-sm font-medium text-red-800">エラー</p>
-					<p class="text-sm text-red-700">{connectionError}</p>
-				</div>
-			{/if}
-
-			<div class="space-y-2">
-				<Label>接続情報</Label>
-				<div class="text-sm text-muted-foreground">
-					{#if isConnected && connection}
-						<p>接続先: {connection.host}:{connection.port}</p>
-						<p>接続ID: {connection.id}</p>
-						<p>接続時刻: {connection.connectedAt}</p>
-						<p>状態: ✓ 接続中</p>
-						<p>受信数: {receivedMessages.length} 件</p>
-					{:else}
-						<p>接続先: {host}:{port}</p>
-						<p>状態: ⚠ 未接続</p>
-					{/if}
-				</div>
-			</div>
-		</CardContent>
-	</Card>
-
-	<!-- TCP送信 -->
-	{#if isConnected}
-		<Card class="w-full max-w-2xl">
-			<CardHeader>
-				<CardTitle>TCP メッセージ送信</CardTitle>
-				<CardDescription>接続上でメッセージを送信します（CRデリミタ付き）</CardDescription>
-			</CardHeader>
-			<CardContent class="space-y-4">
-				<div class="space-y-2">
-					<Label for="message">メッセージ</Label>
-					<textarea
-						id="message"
-						bind:value={message}
-						placeholder="送信するメッセージを入力してください（Shift+Enterで送信）..."
-						rows="4"
-						class="flex field-sizing-content min-h-16 w-full rounded-md border border-input bg-transparent px-3 py-2 text-base shadow-xs transition-[color,box-shadow] outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50 disabled:cursor-not-allowed disabled:opacity-50 aria-invalid:border-destructive aria-invalid:ring-destructive/20 md:text-sm dark:bg-input/30 dark:aria-invalid:ring-destructive/40"
-						on:input={clearResults}
-						on:keydown={handleKeydown}
-					></textarea>
-					<p class="text-sm text-muted-foreground">
-						メッセージの末尾に自動的にCR（\r）が追加されます • Shift+Enterで送信、Enterで改行
-					</p>
-				</div>
-
-				<div class="flex gap-2">
-					<Button onclick={validateAndSend} disabled={!sendIsValid || sending} class="flex-1">
-						{sending ? '送信中...' : 'メッセージ送信'}
-					</Button>
 					<Button
-						variant="outline"
-						onclick={() => {
-							message = '';
-							clearResults();
-						}}
-						disabled={sending}
+						size="sm"
+						onclick={disconnectTcp}
+						variant="destructive"
+						class="bg-red-600 hover:bg-red-700"
 					>
-						クリア
+						Disconnect
 					</Button>
-				</div>
+				{/if}
+			</div>
+		</div>
 
-				{#if sendResult}
-					<div class="rounded-md border border-green-200 bg-green-50 p-3">
-						<p class="text-sm font-medium text-green-800">成功</p>
-						<p class="text-sm text-green-700">{sendResult}</p>
+		<!-- エラー・成功メッセージ -->
+		{#if connectionError}
+			<div class="mt-2 text-sm text-red-400">
+				ERROR: {connectionError}
+			</div>
+		{/if}
+		{#if connectionResult}
+			<div class="mt-2 text-sm text-green-400">
+				{connectionResult}
+			</div>
+		{/if}
+	</div>
+
+	<!-- メッセージ履歴エリア -->
+	<div class="flex-1 space-y-1 overflow-y-auto p-4" bind:this={historyContainer}>
+		{#if isConnected}
+			<!-- 統合されたメッセージ履歴 -->
+			{@const allMessages = [
+				...sentMessages.map((m) => ({ type: 'sent', ...m })),
+				...receivedMessages.map((m) => ({ type: 'received', ...m }))
+			].sort((a, b) => {
+				const aTime =
+					a.type === 'sent'
+						? new Date(`1970-01-01 ${a.timestamp}`).getTime()
+						: new Date(a.timestamp).getTime();
+				const bTime =
+					b.type === 'sent'
+						? new Date(`1970-01-01 ${b.timestamp}`).getTime()
+						: new Date(b.timestamp).getTime();
+				return aTime - bTime;
+			})}
+
+			{#each allMessages as msg (msg.type === 'sent' ? `sent-${msg.id}` : `received-${msg.timestamp}-${msg.client_addr}`)}
+				{#if msg.type === 'sent'}
+					<div class="flex">
+						<span class="mr-2 text-blue-400">[{msg.timestamp}]</span>
+						<span class="mr-2 text-blue-300">→</span>
+						<span class="break-all text-white">{msg.message}</span>
+						{#if !msg.success}
+							<span class="ml-2 text-red-400">(FAILED)</span>
+						{/if}
+					</div>
+				{:else}
+					<div class="flex">
+						<span class="mr-2 text-green-400">[{new Date(msg.timestamp).toLocaleTimeString()}]</span
+						>
+						<span class="mr-2 text-green-300">←</span>
+						<span class="break-all text-green-100">{msg.message}</span>
+						<span class="ml-2 text-xs text-gray-400">({msg.client_addr})</span>
 					</div>
 				{/if}
+			{/each}
+		{:else}
+			<div class="py-8 text-center text-gray-500">
+				Not connected. Enter host:port and click Connect to start.
+			</div>
+		{/if}
+	</div>
 
-				{#if sendError}
-					<div class="rounded-md border border-red-200 bg-red-50 p-3">
-						<p class="text-sm font-medium text-red-800">エラー</p>
-						<p class="text-sm text-red-700">{sendError}</p>
-					</div>
-				{/if}
-
-				<div class="space-y-2">
-					<Label>送信情報</Label>
-					<div class="text-sm text-muted-foreground">
-						<p>送信先: {connection?.host}:{connection?.port}</p>
-						<p>メッセージ長: {message.length} 文字</p>
-						<p>状態: {sendIsValid ? '✓ 送信可能' : '⚠ 入力確認が必要'}</p>
-					</div>
+	<!-- 送信エリア（固定底部） -->
+	{#if isConnected}
+		<div class="flex-shrink-0 border-t border-gray-700 bg-gray-800 p-4">
+			{#if sendError}
+				<div class="mb-2 text-sm text-red-400">
+					ERROR: {sendError}
 				</div>
-			</CardContent>
-		</Card>
-	{/if}
-
-	<!-- 受信メッセージ履歴 -->
-	{#if receivedMessages.length > 0}
-		<Card class="w-full max-w-2xl">
-			<CardHeader>
-				<CardTitle>受信メッセージ履歴</CardTitle>
-				<CardDescription>受信したメッセージの一覧（最新順）</CardDescription>
-			</CardHeader>
-			<CardContent>
-				<div class="max-h-96 space-y-3 overflow-y-auto">
-					{#each receivedMessages
-						.slice()
-						.reverse() as msg (msg.timestamp + msg.client_addr + msg.message)}
-						<div class="rounded-md border border-blue-200 bg-blue-50 p-3">
-							<div class="mb-2 flex items-start justify-between">
-								<Badge variant="outline" class="text-xs">
-									{msg.client_addr}
-								</Badge>
-								<span class="text-xs text-blue-600">{msg.timestamp}</span>
-							</div>
-							<p class="font-mono text-sm break-all text-blue-800">{msg.message}</p>
-						</div>
-					{/each}
+			{/if}
+			{#if sendResult}
+				<div class="mb-2 text-sm text-green-400">
+					{sendResult}
 				</div>
-			</CardContent>
-		</Card>
+			{/if}
+
+			<div class="flex space-x-2">
+				<div class="flex-shrink-0 self-end pb-2 text-green-400">$</div>
+				<textarea
+					bind:value={message}
+					placeholder="Type message and press Shift+Enter to send..."
+					rows="1"
+					class="flex-1 resize-none rounded border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none"
+					on:keydown={handleKeydown}
+					style="field-sizing: content; min-height: 40px;"
+				></textarea>
+				<Button
+					onclick={validateAndSend}
+					disabled={!sendIsValid || sending}
+					size="sm"
+					class="self-end bg-green-600 text-white hover:bg-green-700"
+				>
+					{sending ? 'Sending...' : 'Send'}
+				</Button>
+			</div>
+		</div>
 	{/if}
 </div>

@@ -115,12 +115,14 @@ cargo run
 ```
 
 **サーバー仕様**：
+
 - アドレス: `127.0.0.1:8080` (localhost:8080)
 - プロトコル: TCP
 - 機能: エコーサーバー（受信したメッセージをそのまま返信）
 - 停止: Ctrl+C
 
 **デバッグ手順**：
+
 1. TCPサーバー起動: `cd tools/tcp-server && cargo run`
 2. Tauriアプリ起動: `yarn tauri:dev`
 3. アプリでlocalhost:8080に接続してテスト
