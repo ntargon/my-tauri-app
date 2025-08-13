@@ -4,7 +4,7 @@
 
 	import { TcpClient } from '$lib/tcp-client.js';
 	import type { TcpReceivedMessage, TcpConnection } from '$lib/types/tcp.js';
-	import { onMount, onDestroy } from 'svelte';
+	import { onMount, onDestroy, tick } from 'svelte';
 	import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 	import { fontSize, loadSettings } from '$lib/stores/settings.js';
 	import { SettingsWindow } from '$lib/settings-window.js';
@@ -70,22 +70,6 @@
 		}
 	}
 
-	// メッセージ入力にフォーカスする
-	function focusMessageInput() {
-		if (messageInput) {
-			setTimeout(() => {
-				messageInput.focus();
-			}, 100);
-		} else {
-			// DOM要素がまだ準備できていない場合、少し待ってリトライ
-			setTimeout(() => {
-				if (messageInput) {
-					messageInput.focus();
-				}
-			}, 200);
-		}
-	}
-
 	// 設定ウィンドウを開く
 	async function openSettings() {
 		try {
@@ -110,7 +94,10 @@
 				isConnected = true;
 				connectionResult = `接続確立: ${response.connection.host}:${response.connection.port}`;
 				setupMessageEventListener();
-				focusMessageInput(); // 接続後に自動フォーカス
+
+				// DOM更新完了後にフォーカス実行
+				await tick();
+				messageInput?.focus();
 			} else {
 				connectionError = response.error || '接続に失敗しました';
 			}
@@ -337,16 +324,6 @@
 	$effect(() => {
 		if ($fontSize !== currentFontSize) {
 			currentFontSize = $fontSize;
-		}
-	});
-
-	// 接続状態変更時の自動フォーカス
-	$effect(() => {
-		if (isConnected && messageInput) {
-			// 接続確立後、少し待ってからフォーカス
-			setTimeout(() => {
-				focusMessageInput();
-			}, 150);
 		}
 	});
 </script>
