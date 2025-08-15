@@ -9,14 +9,19 @@
 	} from '$lib/components/ui/card/index.js';
 	import { Slider } from '$lib/components/ui/slider/index.js';
 	import { fontSize, loadSettings, saveFontSize, resetSettings } from '$lib/stores/settings.js';
+	import { calculateResponsiveSizes } from '$lib/utils.js';
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
+import { emit } from '@tauri-apps/api/event';
 
 	// フォントサイズ設定
 	let currentFontSize = $state(14);
 	let fontSizeSliderValue = $state(14);
 	let saving = $state(false);
 	let saveMessage = $state('');
+
+	// レスポンシブサイズ計算
+	const responsiveSizes = $derived(calculateResponsiveSizes(fontSizeSliderValue));
 
 	// フォントサイズ変更ハンドラー
 	async function handleFontSizeChange(value: number) {
@@ -26,8 +31,14 @@
 		saveMessage = '';
 
 		try {
+			// ストアの値を直接更新（即座にメイン画面に反映）
+			fontSize.set(value);
 			await saveFontSize(value);
 			currentFontSize = value;
+			
+			// Tauriイベントでウィンドウ間通信
+			await emit('font-size-changed', { fontSize: value });
+			
 			saveMessage = '保存しました';
 			// 2秒後にメッセージを消す
 			setTimeout(() => {
@@ -35,6 +46,8 @@
 			}, 2000);
 		} catch (error) {
 			console.error('フォントサイズの保存に失敗:', error);
+			// ストアの値を元に戻す
+			fontSize.set(currentFontSize);
 			saveMessage = '保存に失敗しました';
 			// エラー時はスライダーを元の値に戻す
 			fontSizeSliderValue = currentFontSize;
@@ -54,9 +67,15 @@
 		saveMessage = '';
 
 		try {
+			// ストアの値を直接更新（即座にメイン画面に反映）
+			fontSize.set(14);
 			await resetSettings();
 			currentFontSize = 14;
 			fontSizeSliderValue = 14;
+			
+			// Tauriイベントでウィンドウ間通信
+			await emit('font-size-changed', { fontSize: 14 });
+			
 			saveMessage = 'リセットしました';
 			setTimeout(() => {
 				saveMessage = '';
@@ -101,7 +120,10 @@
 	<title>設定 - TCP Terminal</title>
 </svelte:head>
 
-<div class="min-h-screen bg-gray-900 p-6" style="--app-font-size: {currentFontSize}px;">
+<div
+	class="min-h-screen bg-gray-900 p-6"
+	style="--app-font-size: {fontSizeSliderValue}px; --textarea-min-height: {responsiveSizes.textareaMinHeight}px; --textarea-max-height: {responsiveSizes.textareaMaxHeight}px; --button-height: {responsiveSizes.buttonHeight}px; --padding: {responsiveSizes.padding}px; --margin: {responsiveSizes.margin}px;"
+>
 	<div class="mx-auto max-w-2xl">
 		<!-- ヘッダー -->
 		<div class="mb-6 flex items-center justify-between">
@@ -110,6 +132,8 @@
 				✕
 			</Button>
 		</div>
+
+
 
 		<!-- フォント設定 -->
 		<Card class="mb-6 border-gray-700 bg-gray-800">
@@ -145,13 +169,48 @@
 
 					<!-- プレビューテキスト -->
 					<div
-						class="rounded border border-gray-600 bg-gray-700 p-3 font-mono text-green-400"
-						style="font-size: var(--app-font-size);"
+						class="rounded border border-gray-600 bg-gray-700 font-mono text-green-400"
+						style="padding: var(--padding);"
 					>
-						<div class="text-blue-400">[12:34:56.789] →</div>
-						<div class="text-white">Hello, TCP Terminal!</div>
-						<div class="text-green-400">[12:34:56.790] ←</div>
-						<div class="text-green-100">Echo: Hello, TCP Terminal!</div>
+						<!-- メッセージ履歴プレビュー -->
+						<div class="mb-2 space-y-1" style="font-size: var(--app-font-size);">
+							<div class="flex">
+								<span class="mr-2 text-blue-400">[12:34:56.789]</span>
+								<span class="mr-2 text-blue-300">→</span>
+								<span class="text-white">Hello, TCP Terminal!</span>
+							</div>
+							<div class="flex">
+								<span class="mr-2 text-green-400">[12:34:56.790]</span>
+								<span class="mr-2 text-green-300">←</span>
+								<span class="text-green-100">Echo: Hello, TCP Terminal!</span>
+							</div>
+						</div>
+
+						<!-- 送信エリアプレビュー -->
+						<div class="border-t border-gray-600" style="padding-top: var(--padding);">
+							<div class="flex" style="gap: var(--margin);">
+								<div
+									class="flex-shrink-0 self-end text-green-400"
+									style="padding-bottom: var(--padding);"
+								>
+									$
+								</div>
+								<textarea
+									placeholder="Type message and press Enter to send..."
+									rows="1"
+									class="flex-1 resize-none rounded border border-gray-600 bg-gray-600 text-white placeholder-gray-400"
+									style="field-sizing: content; min-height: var(--textarea-min-height); max-height: var(--textarea-max-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 1.5);"
+									readonly
+								></textarea>
+								<button
+									class="rounded bg-green-600 text-white"
+									style="height: var(--button-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 2);"
+									disabled
+								>
+									Send
+								</button>
+							</div>
+						</div>
 					</div>
 
 					{#if saveMessage}

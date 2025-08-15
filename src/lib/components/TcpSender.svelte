@@ -7,6 +7,7 @@
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { listen, type UnlistenFn } from '@tauri-apps/api/event';
 	import { fontSize, loadSettings } from '$lib/stores/settings.js';
+	import { calculateResponsiveSizes } from '$lib/utils.js';
 	import { SettingsWindow } from '$lib/settings-window.js';
 
 	// 接続管理の状態
@@ -39,6 +40,7 @@
 
 	// キーボードイベントリスナーの管理
 	let keyboardUnlisten: (() => void) | null = null;
+	let fontSizeUnlisten: (() => void) | null = null;
 
 	// 履歴コンテナの参照
 	let historyContainer: HTMLDivElement;
@@ -48,6 +50,9 @@
 
 	// フォントサイズ設定
 	let currentFontSize = $state(14);
+
+	// レスポンシブサイズ計算
+	const responsiveSizes = $derived(calculateResponsiveSizes($fontSize));
 
 	// Rustから取得したRFC 3339タイムスタンプをフォーマット
 	function formatTimestampFromRust(timestamp: string): string {
@@ -236,6 +241,20 @@
 		}
 	}
 
+	// フォントサイズ変更イベントリスナー
+	async function setupFontSizeListener() {
+		try {
+			const unlisten = await listen('font-size-changed', (event) => {
+				const payload = event.payload as { fontSize: number };
+				fontSize.set(payload.fontSize);
+			});
+			return unlisten;
+		} catch (error) {
+			console.error('フォントサイズリスナーのセットアップに失敗:', error);
+			return null;
+		}
+	}
+
 	// Tauriキーボードショートカットハンドラー
 	async function setupKeyboardListeners() {
 		try {
@@ -290,6 +309,13 @@
 			console.warn('キーボードリスナーのセットアップに失敗しました:', error);
 		});
 
+		// フォントサイズ変更リスナーをセットアップ
+		setupFontSizeListener().then((unlisten) => {
+			fontSizeUnlisten = unlisten;
+		}).catch((error) => {
+			console.warn('フォントサイズリスナーのセットアップに失敗しました:', error);
+		});
+
 		// フォールバック用ブラウザキーボードイベントリスナー追加
 		if (typeof window !== 'undefined') {
 			window.addEventListener('keydown', handleGlobalKeydown);
@@ -299,6 +325,9 @@
 			stopMessageEventListener();
 			if (keyboardUnlisten) {
 				keyboardUnlisten();
+			}
+			if (fontSizeUnlisten) {
+				fontSizeUnlisten();
 			}
 			if (typeof window !== 'undefined') {
 				window.removeEventListener('keydown', handleGlobalKeydown);
@@ -310,6 +339,9 @@
 		stopMessageEventListener();
 		if (keyboardUnlisten) {
 			keyboardUnlisten();
+		}
+		if (fontSizeUnlisten) {
+			fontSizeUnlisten();
 		}
 		if (typeof window !== 'undefined') {
 			window.removeEventListener('keydown', handleGlobalKeydown);
@@ -330,28 +362,33 @@
 
 <div
 	class="flex h-screen flex-col bg-gray-900 font-mono text-green-400"
-	style="--app-font-size: {currentFontSize}px;"
+	style="--app-font-size: {$fontSize}px; --textarea-min-height: {responsiveSizes.textareaMinHeight}px; --textarea-max-height: {responsiveSizes.textareaMaxHeight}px; --button-height: {responsiveSizes.buttonHeight}px; --padding: {responsiveSizes.padding}px; --margin: {responsiveSizes.margin}px;"
 >
+
 	<!-- ヘッダー: 接続情報 -->
-	<div class="flex-shrink-0 border-b border-gray-700 bg-gray-800 p-2">
+	<div class="flex-shrink-0 border-b border-gray-700 bg-gray-800" style="padding: var(--padding);">
 		<div class="flex items-center justify-between">
 			<div class="flex items-center space-x-4">
-				<h1 class="text-lg font-bold">TCP Terminal</h1>
+				<h1 class="font-bold" style="font-size: calc(var(--app-font-size) * 1.25);">
+					TCP Terminal
+				</h1>
 				<div class="flex items-center space-x-2">
 					<input
 						bind:value={host}
 						placeholder="host"
-						class="w-24 rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-white"
+						class="w-24 rounded border border-gray-600 bg-gray-700 px-2 py-1 text-white"
+						style="font-size: var(--app-font-size);"
 						disabled={isConnected || connecting}
 					/>
-					<span class="text-gray-400">:</span>
+					<span class="text-gray-400" style="font-size: var(--app-font-size);">:</span>
 					<input
 						type="number"
 						bind:value={port}
 						placeholder="port"
 						min="1"
 						max="65535"
-						class="w-20 rounded border border-gray-600 bg-gray-700 px-2 py-1 text-sm text-white"
+						class="w-20 rounded border border-gray-600 bg-gray-700 px-2 py-1 text-white"
+						style="font-size: var(--app-font-size);"
 						disabled={isConnected || connecting}
 					/>
 				</div>
@@ -364,6 +401,7 @@
 					variant="ghost"
 					onclick={openSettings}
 					class="text-gray-400 hover:bg-gray-700 hover:text-white"
+					style="font-size: var(--app-font-size);"
 					title="設定を開く"
 				>
 					⚙️ 設定
@@ -374,6 +412,7 @@
 				<Badge
 					variant={isConnected ? 'default' : 'secondary'}
 					class={isConnected ? 'bg-green-600 text-white' : 'bg-gray-600 text-gray-300'}
+					style="font-size: var(--app-font-size);"
 				>
 					{isConnected ? 'CONNECTED' : 'DISCONNECTED'}
 				</Badge>
@@ -384,6 +423,7 @@
 						onclick={validateAndConnect}
 						disabled={!connectionIsValid || connecting}
 						class="bg-blue-600 text-white hover:bg-blue-700"
+						style="font-size: var(--app-font-size);"
 					>
 						{connecting ? 'Connecting...' : 'Connect'}
 					</Button>
@@ -393,6 +433,7 @@
 						onclick={disconnectTcp}
 						variant="destructive"
 						class="bg-red-600 hover:bg-red-700"
+						style="font-size: var(--app-font-size);"
 					>
 						Disconnect
 					</Button>
@@ -402,12 +443,12 @@
 
 		<!-- エラー・成功メッセージ -->
 		{#if connectionError}
-			<div class="mt-2 text-sm text-red-400">
+			<div class="mt-2 text-red-400" style="font-size: var(--app-font-size);">
 				ERROR: {connectionError}
 			</div>
 		{/if}
 		{#if connectionResult}
-			<div class="mt-2 text-sm text-green-400">
+			<div class="mt-2 text-green-400" style="font-size: var(--app-font-size);">
 				{connectionResult}
 			</div>
 		{/if}
@@ -415,9 +456,9 @@
 
 	<!-- メッセージ履歴エリア -->
 	<div
-		class="flex-1 space-y-1 overflow-y-auto p-2"
+		class="flex-1 space-y-1 overflow-y-auto"
 		bind:this={historyContainer}
-		style="font-size: var(--app-font-size); min-height: 0;"
+		style="font-size: var(--app-font-size); min-height: 0; padding: var(--padding);"
 	>
 		{#if isConnected}
 			<!-- 統合されたメッセージ履歴 -->
@@ -452,10 +493,10 @@
 			{/each}
 		{:else}
 			<div class="flex h-full flex-col items-center justify-center space-y-4 text-gray-500">
-				<div class="text-lg">TCP Terminal Ready</div>
-				<div class="text-center text-sm">
+				<div style="font-size: calc(var(--app-font-size) * 1.2);">TCP Terminal Ready</div>
+				<div class="text-center" style="font-size: var(--app-font-size);">
 					Enter host:port above and click Connect to start<br />
-					<span class="text-xs text-gray-600"
+					<span class="text-gray-600" style="font-size: calc(var(--app-font-size) * 0.8);"
 						>Shortcuts: Ctrl+N (Connect), Ctrl+I (Disconnect), Enter (Send), Shift+Enter (New line)</span
 					>
 				</div>
@@ -465,28 +506,33 @@
 
 	<!-- 送信エリア（固定底部） -->
 	{#if isConnected}
-		<div class="flex-shrink-0 border-t border-gray-700 bg-gray-800 p-2">
+		<div
+			class="flex-shrink-0 border-t border-gray-700 bg-gray-800"
+			style="padding: var(--padding);"
+		>
 			{#if sendError}
-				<div class="mb-2 text-sm text-red-400">
+				<div class="mb-2 text-red-400" style="font-size: var(--app-font-size);">
 					ERROR: {sendError}
 				</div>
 			{/if}
 			{#if sendResult}
-				<div class="mb-2 text-sm text-green-400">
+				<div class="mb-2 text-green-400" style="font-size: var(--app-font-size);">
 					{sendResult}
 				</div>
 			{/if}
 
-			<div class="flex space-x-2">
-				<div class="flex-shrink-0 self-end pb-2 text-green-400">$</div>
+			<div class="flex" style="gap: var(--margin);">
+				<div class="flex-shrink-0 self-end text-green-400" style="padding-bottom: var(--padding);">
+					$
+				</div>
 				<textarea
 					bind:this={messageInput}
 					bind:value={message}
 					placeholder="Type message and press Enter to send..."
 					rows="1"
-					class="flex-1 resize-none rounded border border-gray-600 bg-gray-700 px-3 py-2 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none"
+					class="flex-1 resize-none rounded border border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none"
 					onkeydown={handleKeydown}
-					style="field-sizing: content; min-height: 40px; max-height: 120px; font-size: var(--app-font-size);"
+					style="field-sizing: content; min-height: var(--textarea-min-height); max-height: var(--textarea-max-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 1.5);"
 					aria-label="Message input"
 				></textarea>
 				<Button
@@ -494,6 +540,7 @@
 					disabled={!sendIsValid || sending}
 					size="sm"
 					class="self-end bg-green-600 text-white hover:bg-green-700"
+					style="height: var(--button-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 2);"
 					aria-label="Send message"
 					title="Send message (Enter)"
 				>
