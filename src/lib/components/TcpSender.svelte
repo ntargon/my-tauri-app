@@ -484,9 +484,6 @@
 						<span class="mr-2 text-green-400">[{formatTimestampFromRust(msg.timestamp)}]</span>
 						<span class="mr-2 text-green-300">←</span>
 						<span class="break-all text-green-100">{msg.message}</span>
-						<span class="ml-2 text-xs text-gray-400"
-							>({(msg as TcpReceivedMessage).client_addr})</span
-						>
 					</div>
 				{/if}
 			{/each}
