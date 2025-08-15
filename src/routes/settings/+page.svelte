@@ -12,7 +12,7 @@
 	import { calculateResponsiveSizes } from '$lib/utils.js';
 	import { onMount } from 'svelte';
 	import { invoke } from '@tauri-apps/api/core';
-import { emit } from '@tauri-apps/api/event';
+	import { emit } from '@tauri-apps/api/event';
 
 	// フォントサイズ設定
 	let currentFontSize = $state(14);
@@ -35,10 +35,10 @@ import { emit } from '@tauri-apps/api/event';
 			fontSize.set(value);
 			await saveFontSize(value);
 			currentFontSize = value;
-			
+
 			// Tauriイベントでウィンドウ間通信
 			await emit('font-size-changed', { fontSize: value });
-			
+
 			saveMessage = '保存しました';
 			// 2秒後にメッセージを消す
 			setTimeout(() => {
@@ -72,10 +72,10 @@ import { emit } from '@tauri-apps/api/event';
 			await resetSettings();
 			currentFontSize = 14;
 			fontSizeSliderValue = 14;
-			
+
 			// Tauriイベントでウィンドウ間通信
 			await emit('font-size-changed', { fontSize: 14 });
-			
+
 			saveMessage = 'リセットしました';
 			setTimeout(() => {
 				saveMessage = '';
@@ -122,7 +122,7 @@ import { emit } from '@tauri-apps/api/event';
 
 <div
 	class="min-h-screen bg-gray-900 p-6"
-	style="--app-font-size: {fontSizeSliderValue}px; --textarea-min-height: {responsiveSizes.textareaMinHeight}px; --textarea-max-height: {responsiveSizes.textareaMaxHeight}px; --button-height: {responsiveSizes.buttonHeight}px; --padding: {responsiveSizes.padding}px; --margin: {responsiveSizes.margin}px;"
+	style="--app-font-size: {fontSizeSliderValue}px; --input-height: {responsiveSizes.inputHeight}px; --button-height: {responsiveSizes.buttonHeight}px; --padding: {responsiveSizes.padding}px; --margin: {responsiveSizes.margin}px;"
 >
 	<div class="mx-auto max-w-2xl">
 		<!-- ヘッダー -->
@@ -132,8 +132,6 @@ import { emit } from '@tauri-apps/api/event';
 				✕
 			</Button>
 		</div>
-
-
 
 		<!-- フォント設定 -->
 		<Card class="mb-6 border-gray-700 bg-gray-800">
@@ -189,19 +187,12 @@ import { emit } from '@tauri-apps/api/event';
 						<!-- 送信エリアプレビュー -->
 						<div class="border-t border-gray-600" style="padding-top: var(--padding);">
 							<div class="flex" style="gap: var(--margin);">
-								<div
-									class="flex-shrink-0 self-end text-green-400"
-									style="padding-bottom: var(--padding);"
-								>
-									$
-								</div>
-								<textarea
+								<input
 									placeholder="Type message and press Enter to send..."
-									rows="1"
-									class="flex-1 resize-none rounded border border-gray-600 bg-gray-600 text-white placeholder-gray-400"
-									style="field-sizing: content; min-height: var(--textarea-min-height); max-height: var(--textarea-max-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 1.5);"
+									class="flex-1 rounded border border-gray-600 bg-gray-600 text-white placeholder-gray-400"
+									style="height: var(--input-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 1.5);"
 									readonly
-								></textarea>
+								/>
 								<button
 									class="rounded bg-green-600 text-white"
 									style="height: var(--button-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 2);"

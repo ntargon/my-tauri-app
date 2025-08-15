@@ -46,7 +46,7 @@
 	let historyContainer: HTMLDivElement;
 
 	// メッセージ入力の参照
-	let messageInput: HTMLTextAreaElement;
+	let messageInput: HTMLInputElement;
 
 	// フォントサイズ設定
 	let currentFontSize = $state(14);
@@ -310,11 +310,13 @@
 		});
 
 		// フォントサイズ変更リスナーをセットアップ
-		setupFontSizeListener().then((unlisten) => {
-			fontSizeUnlisten = unlisten;
-		}).catch((error) => {
-			console.warn('フォントサイズリスナーのセットアップに失敗しました:', error);
-		});
+		setupFontSizeListener()
+			.then((unlisten) => {
+				fontSizeUnlisten = unlisten;
+			})
+			.catch((error) => {
+				console.warn('フォントサイズリスナーのセットアップに失敗しました:', error);
+			});
 
 		// フォールバック用ブラウザキーボードイベントリスナー追加
 		if (typeof window !== 'undefined') {
@@ -362,9 +364,8 @@
 
 <div
 	class="flex h-screen flex-col bg-gray-900 font-mono text-green-400"
-	style="--app-font-size: {$fontSize}px; --textarea-min-height: {responsiveSizes.textareaMinHeight}px; --textarea-max-height: {responsiveSizes.textareaMaxHeight}px; --button-height: {responsiveSizes.buttonHeight}px; --padding: {responsiveSizes.padding}px; --margin: {responsiveSizes.margin}px;"
+	style="--app-font-size: {$fontSize}px; --input-height: {responsiveSizes.inputHeight}px; --button-height: {responsiveSizes.buttonHeight}px; --padding: {responsiveSizes.padding}px; --margin: {responsiveSizes.margin}px;"
 >
-
 	<!-- ヘッダー: 接続情報 -->
 	<div class="flex-shrink-0 border-b border-gray-700 bg-gray-800" style="padding: var(--padding);">
 		<div class="flex items-center justify-between">
@@ -522,19 +523,15 @@
 			{/if}
 
 			<div class="flex" style="gap: var(--margin);">
-				<div class="flex-shrink-0 self-end text-green-400" style="padding-bottom: var(--padding);">
-					$
-				</div>
-				<textarea
+				<input
 					bind:this={messageInput}
 					bind:value={message}
 					placeholder="Type message and press Enter to send..."
-					rows="1"
-					class="flex-1 resize-none rounded border border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none"
+					class="flex-1 rounded border border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none"
 					onkeydown={handleKeydown}
-					style="field-sizing: content; min-height: var(--textarea-min-height); max-height: var(--textarea-max-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 1.5);"
+					style="height: var(--input-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 1.5);"
 					aria-label="Message input"
-				></textarea>
+				/>
 				<Button
 					onclick={validateAndSend}
 					disabled={!sendIsValid || sending}

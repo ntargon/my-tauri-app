@@ -16,8 +16,7 @@ export type WithElementRef<T, U extends HTMLElement = HTMLElement> = T & { ref?:
  * フォントサイズに基づいて動的にサイズを計算するユーティリティ関数
  */
 export interface ResponsiveSizes {
-	textareaMinHeight: number;
-	textareaMaxHeight: number;
+	inputHeight: number;
 	buttonHeight: number;
 	padding: number;
 	margin: number;
@@ -33,11 +32,10 @@ export function calculateResponsiveSizes(fontSize: number): ResponsiveSizes {
 	const scale = fontSize / baseFontSize;
 
 	return {
-		textareaMinHeight: Math.max(32, Math.round(40 * scale)),
-		textareaMaxHeight: Math.max(64, Math.round(120 * scale)),
-		buttonHeight: Math.max(28, Math.round(40 * scale)),
-		padding: Math.max(4, Math.round(8 * scale)),
-		margin: Math.max(2, Math.round(4 * scale)),
+		inputHeight: Math.max(16, Math.round(fontSize + 8)),
+		buttonHeight: Math.max(16, Math.round(fontSize + 8)),
+		padding: Math.max(2, Math.round(4 * scale)),
+		margin: Math.max(1, Math.round(2 * scale)),
 		iconSize: Math.max(12, Math.round(16 * scale))
 	};
 }
