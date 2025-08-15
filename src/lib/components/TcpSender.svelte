@@ -22,7 +22,7 @@
 	// 送信機能の状態
 	let message = $state('');
 	let sending = $state(false);
-	let sendResult = $state('');
+
 	let sendError = $state('');
 
 	// 受信機能の状態
@@ -139,7 +139,6 @@
 		if (sending || !isConnected || !connection) return;
 
 		sending = true;
-		sendResult = '';
 		sendError = '';
 
 		const messageToSend = message;
@@ -157,7 +156,6 @@
 				sentMessage.success = true;
 				sentMessage.timestamp = response.timestamp || new Date().toISOString(); // Rustからのタイムスタンプを使用、フォールバックでJavaScript時刻
 				sentMessages = [...sentMessages, sentMessage];
-				sendResult = response.message;
 				message = ''; // 成功時はメッセージをクリア
 				scrollToBottom();
 			} else {
@@ -516,12 +514,6 @@
 					ERROR: {sendError}
 				</div>
 			{/if}
-			{#if sendResult}
-				<div class="mb-2 text-green-400" style="font-size: var(--app-font-size);">
-					{sendResult}
-				</div>
-			{/if}
-
 			<div class="flex" style="gap: var(--margin);">
 				<input
 					bind:this={messageInput}
