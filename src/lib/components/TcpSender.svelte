@@ -6,7 +6,13 @@
 	import type { TcpReceivedMessage, TcpConnection } from '$lib/types/tcp.js';
 	import { onMount, onDestroy, tick } from 'svelte';
 	import { listen, type UnlistenFn } from '@tauri-apps/api/event';
-	import { fontSize, loadSettings } from '$lib/stores/settings.js';
+	import {
+		fontSize,
+		loadSettings,
+		loadMessageHistory,
+		saveMessageToHistory,
+		getHistoryForConnection
+	} from '$lib/stores/settings.js';
 	import { calculateResponsiveSizes } from '$lib/utils.js';
 	import { SettingsWindow } from '$lib/settings-window.js';
 
@@ -47,6 +53,11 @@
 
 	// メッセージ入力の参照
 	let messageInput: HTMLInputElement;
+
+	// コマンド履歴ナビゲーション
+	let commandHistory: string[] = $state([]);
+	let historyIndex = $state(-1);
+	let originalMessage = $state('');
 
 	// フォントサイズ設定
 	let currentFontSize = $state(14);
@@ -100,6 +111,9 @@
 				connectionResult = `接続確立: ${response.connection.host}:${response.connection.port}`;
 				setupMessageEventListener();
 
+				// 履歴読み込み
+				await loadHistoryForConnection();
+
 				// DOM更新完了後にフォーカス実行
 				await tick();
 				messageInput?.focus();
@@ -132,6 +146,10 @@
 			isConnected = false;
 			receivedMessages = [];
 			sentMessages = [];
+			// 履歴状態をリセット
+			commandHistory = [];
+			historyIndex = -1;
+			originalMessage = '';
 		}
 	}
 
@@ -156,6 +174,18 @@
 				sentMessage.success = true;
 				sentMessage.timestamp = response.timestamp || new Date().toISOString(); // Rustからのタイムスタンプを使用、フォールバックでJavaScript時刻
 				sentMessages = [...sentMessages, sentMessage];
+
+				// 成功時のみ履歴に保存
+				try {
+					await saveMessageToHistory(host, port, messageToSend);
+					// ローカル履歴も更新
+					if (!commandHistory.includes(messageToSend)) {
+						commandHistory = [...commandHistory, messageToSend];
+					}
+				} catch (historyError) {
+					console.warn('履歴保存に失敗しました:', historyError);
+				}
+
 				message = ''; // 成功時はメッセージをクリア
 				scrollToBottom();
 			} else {
@@ -201,7 +231,18 @@
 				return;
 			}
 
+			// 履歴ナビゲーション状態をリセット
+			historyIndex = -1;
+			originalMessage = '';
 			validateAndSend();
+		} else if (event.key === 'ArrowUp') {
+			// 上矢印: 過去のメッセージに戻る
+			event.preventDefault();
+			navigateHistory('up');
+		} else if (event.key === 'ArrowDown') {
+			// 下矢印: 新しいメッセージに進む
+			event.preventDefault();
+			navigateHistory('down');
 		}
 	}
 
@@ -292,6 +333,49 @@
 				disconnectTcp();
 			}
 			return;
+		}
+	}
+
+	// 履歴ナビゲーション関数
+	function navigateHistory(direction: 'up' | 'down') {
+		if (commandHistory.length === 0) return;
+
+		if (direction === 'up') {
+			if (historyIndex === -1) {
+				// 初回ナビゲーション: 現在の入力を保存
+				originalMessage = message;
+				historyIndex = commandHistory.length - 1;
+			} else if (historyIndex > 0) {
+				historyIndex--;
+			}
+
+			if (historyIndex >= 0 && historyIndex < commandHistory.length) {
+				message = commandHistory[historyIndex];
+			}
+		} else if (direction === 'down') {
+			if (historyIndex === -1) return; // 履歴ナビゲーション中でない
+
+			if (historyIndex < commandHistory.length - 1) {
+				historyIndex++;
+				message = commandHistory[historyIndex];
+			} else {
+				// 履歴の最後: 元のメッセージに戻す
+				historyIndex = -1;
+				message = originalMessage;
+			}
+		}
+	}
+
+	// 接続時の履歴読み込み
+	async function loadHistoryForConnection() {
+		try {
+			const allHistory = await loadMessageHistory();
+			commandHistory = getHistoryForConnection(host, port, allHistory);
+			historyIndex = -1;
+			originalMessage = '';
+		} catch (error) {
+			console.warn('履歴の読み込みに失敗しました:', error);
+			commandHistory = [];
 		}
 	}
 
