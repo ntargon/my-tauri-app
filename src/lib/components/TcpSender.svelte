@@ -516,6 +516,7 @@
 					bind:this={messageInput}
 					bind:value={message}
 					placeholder="Type message and press Enter to send..."
+					autocapitalize="none"
 					class="flex-1 rounded border border-gray-600 bg-gray-700 text-white placeholder-gray-400 focus:border-green-500 focus:outline-none"
 					onkeydown={handleKeydown}
 					style="height: var(--input-height); font-size: var(--app-font-size); padding: var(--padding) calc(var(--padding) * 1.5);"
