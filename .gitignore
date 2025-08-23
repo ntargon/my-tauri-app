@@ -24,3 +24,6 @@ vite.config.ts.timestamp-*
 
 # serena
 .serena/
+
+# claude
+settings.local.json
